@@ -3,7 +3,7 @@
 #define BE_BGLGEN_BGLGEN_APP_HPP_
 
 #include <be/core/lifecycle.hpp>
-#include <be/core/be.hpp>
+#include <be/core/filesystem.hpp>
 
 namespace be::bglgen {
 
@@ -17,6 +17,10 @@ public:
 private:
    CoreInitLifecycle init_;
    be::I8 status_ = 0;
+
+   Path spec_location_;
+   std::vector<Path> source_paths_;
+   std::vector<S> lua_chunks_;
 };
 
 } // be::bglgen

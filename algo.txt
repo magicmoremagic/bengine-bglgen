@@ -1,0 +1,42 @@
+Configuration
+   api = 'gl'
+   target_version = 3.3
+   profile = 'core' or 'compatibility'
+
+   extension configuration
+      [glname] -> false -- poisoned extension
+      [glname] -> true -- allowed unchecked extension
+      [glname] -> nil -- checked only extension - extension name as check string
+      [glname] -> 'asdf' -- checked only extension - 'asdf' as check string
+      [glname] -> { 'asdf', 'bbbb' } -- checked only extension - allowed in 'asdf' or 'bbbb' check blocks
+
+   symbol configuration
+      [glname] -> false -- poisoned symbol
+      [glname] -> _G.ignored -- ignore symbol usages entirely
+      [glname] -> nil or true -- continue processing
+
+
+
+- Create empty enums set
+- Create empty groups set
+- Create empty types set
+- Create empty commands set
+- Create empty extensions set
+
+1. For each found gl constant
+   a. Check symbol configuration
+   b. If not ignored/error
+      i. Add to enums set
+
+2. For each found gl function
+   a. Check symbol configuration
+   b. If not ignored/error
+      i. Add name to commands set
+      ii. Add return type and parameter types to types set
+      iii. Add return and parameter groups to groups set
+      iv. Add to extensions set if 
+
+3. For each group in groups set
+   a. For each enum in group
+      ii. 
+      i. Add to enums set

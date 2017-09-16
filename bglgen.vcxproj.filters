@@ -9,12 +9,21 @@
       <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
       <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
     </Filter>
+    <Filter Include="Meta-Source Files">
+      <UniqueIdentifier>{ee923deb-f989-4d4c-bea0-9e137825dbfd}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\bglgen.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\bglgen_app.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\pugi.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\lexer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -25,5 +34,19 @@
     <ClInclude Include="include\version.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="include\lexer.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\bglgen_lua.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="meta\lexer.rl">
+      <Filter>Meta-Source Files</Filter>
+    </None>
+    <None Include="meta\bglgen.lua">
+      <Filter>Meta-Source Files</Filter>
+    </None>
   </ItemGroup>
 </Project>

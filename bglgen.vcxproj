@@ -44,10 +44,18 @@
   <ItemGroup>
     <ClCompile Include="src\bglgen.cpp" />
     <ClCompile Include="src\bglgen_app.cpp" />
+    <ClCompile Include="src\lexer.cpp" />
+    <ClCompile Include="src\pugi.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\bglgen_app.hpp" />
+    <ClInclude Include="include\bglgen_lua.hpp" />
+    <ClInclude Include="include\lexer.hpp" />
     <ClInclude Include="include\version.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="meta\bglgen.lua" />
+    <None Include="meta\lexer.rl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

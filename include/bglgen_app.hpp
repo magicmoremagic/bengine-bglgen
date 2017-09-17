@@ -18,7 +18,10 @@ private:
    CoreInitLifecycle init_;
    be::I8 status_ = 0;
 
-   Path spec_location_;
+   Path registry_location_;
+   Path registry_db_location_;
+   bool rebuild_db_;
+
    std::vector<Path> source_paths_;
    std::vector<S> lua_chunks_;
 };

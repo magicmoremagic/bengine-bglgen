@@ -241,6 +241,7 @@ config = {
    features = { },
    extensions = { },
    enums = { },
+   commands = { },
    symbols = { GL_ALWAYS = false }
 }
 
@@ -275,19 +276,21 @@ function process ()
 
       feature = gl_registry.get_feature(constant.name, config.api)
       if feature then
-         be.util.print_r(feature)
+
+
+
          goto continue
       end
 
       extension = gl_registry.get_extension(constant.name, config.api)
       if extension then
-         be.util.print_r(extension)
+
          goto continue
       end
 
       enum = gl_registry.get_enum(constant.name, config.api)
       if enum then
-         be.util.print_r(enum)
+
          goto continue
       end
 

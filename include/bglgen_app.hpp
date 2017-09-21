@@ -20,10 +20,11 @@ private:
 
    Path registry_location_;
    Path registry_db_location_;
-   bool rebuild_db_;
+   bool rebuild_db_ = false;
 
    std::vector<Path> source_paths_;
    std::vector<S> lua_chunks_;
+   bool do_process_ = true;
 };
 
 } // be::bglgen

@@ -16,6 +16,7 @@ tool 'bglgen' {
          'util',
          'util-fs',
          'util-string',
+         'sqlite',
          'cli',
          'blt'
       }

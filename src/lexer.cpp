@@ -7,14 +7,14 @@ namespace be::bglgen {
 namespace {
 
 /* #line 7 "tools\\bglgen\\src\\lexer.cpp" */
-static const int lexer_start = 58;
-static const int lexer_first_final = 58;
+static const int lexer_start = 10;
+static const int lexer_first_final = 10;
 static const int lexer_error = -1;
 
-static const int lexer_en_main = 58;
+static const int lexer_en_main = 10;
 
 
-/* #line 58 "tools\\bglgen\\meta\\lexer.rl" */
+/* #line 63 "tools\\bglgen\\meta\\lexer.rl" */
 
 } // be::bglgen::()
 
@@ -22,12 +22,14 @@ static const int lexer_en_main = 58;
 Lexer::Lexer(Path path, gsl::string_span<> input, std::unordered_multimap<S, SymbolUsage>& output)
    : path_(std::move(path)),
      input_(input),
-	 output_(output) { }
+	 output_(output),
+	 ignore_symbols_(false) { }
 
 ///////////////////////////////////////////////////////////////////////////////
 void Lexer::operator()() {
    check_ = S();
    weight_ = 100;
+   ignore_symbols_ = false;
    ps_ = p_ = input_.data();
    pe_ = p_ + input_.length();
    char* eof = pe_;
@@ -36,7 +38,7 @@ void Lexer::operator()() {
    ls_ = p_;
    line_ = 1;
    
-/* #line 33 "tools\\bglgen\\src\\lexer.cpp" */
+/* #line 35 "tools\\bglgen\\src\\lexer.cpp" */
 	{
 	cs = lexer_start;
 	( ts_) = 0;
@@ -44,9 +46,9 @@ void Lexer::operator()() {
 	act = 0;
 	}
 
-/* #line 79 "tools\\bglgen\\meta\\lexer.rl" */
+/* #line 86 "tools\\bglgen\\meta\\lexer.rl" */
    
-/* #line 39 "tools\\bglgen\\src\\lexer.cpp" */
+/* #line 41 "tools\\bglgen\\src\\lexer.cpp" */
 	{
 	if ( ( p_) == ( pe_) )
 		goto _test_eof;
@@ -58,155 +60,135 @@ tr0:
 	case 1:
 	{{( p_) = ((( te_)))-1;}}
 	break;
-	case 12:
+	case 3:
+	{{( p_) = ((( te_)))-1;} ignore_symbols_ = true; }
+	break;
+	case 4:
+	{{( p_) = ((( te_)))-1;} set_check_(); }
+	break;
+	case 5:
+	{{( p_) = ((( te_)))-1;} check_ = S(); }
+	break;
+	case 6:
+	{{( p_) = ((( te_)))-1;} set_weight_(); }
+	break;
+	case 7:
+	{{( p_) = ((( te_)))-1;} weight_ = 100; }
+	break;
+	case 11:
+	{{( p_) = ((( te_)))-1;}}
+	break;
+	case 14:
 	{{( p_) = ((( te_)))-1;}}
 	break;
 	}
 	}
-	goto st58;
+	goto st10;
 tr2:
-/* #line 51 "tools\\bglgen\\meta\\lexer.rl" */
+/* #line 56 "tools\\bglgen\\meta\\lexer.rl" */
 	{( te_) = ( p_)+1;}
-	goto st58;
+	goto st10;
 tr12:
-/* #line 55 "tools\\bglgen\\meta\\lexer.rl" */
-	{{( p_) = ((( te_)))-1;}}
-	goto st58;
-tr45:
-/* #line 46 "tools\\bglgen\\meta\\lexer.rl" */
-	{( te_) = ( p_)+1;{ set_check_(); }}
-	goto st58;
-tr54:
-/* #line 47 "tools\\bglgen\\meta\\lexer.rl" */
-	{( te_) = ( p_)+1;{ check_ = S(); }}
-	goto st58;
-tr60:
-/* #line 49 "tools\\bglgen\\meta\\lexer.rl" */
-	{( te_) = ( p_)+1;{ weight_ = 100; }}
-	goto st58;
-tr64:
-/* #line 48 "tools\\bglgen\\meta\\lexer.rl" */
-	{( te_) = ( p_)+1;{ set_weight_(); }}
-	goto st58;
-tr66:
-/* #line 55 "tools\\bglgen\\meta\\lexer.rl" */
+/* #line 60 "tools\\bglgen\\meta\\lexer.rl" */
 	{( te_) = ( p_)+1;}
-	goto st58;
-tr67:
-/* #line 50 "tools\\bglgen\\meta\\lexer.rl" */
-	{( te_) = ( p_)+1;{ ls_ = te_; ++line_; }}
-	goto st58;
-tr77:
-/* #line 44 "tools\\bglgen\\meta\\lexer.rl" */
-	{( te_) = ( p_);( p_)--;}
-	goto st58;
-tr78:
-/* #line 50 "tools\\bglgen\\meta\\lexer.rl" */
-	{( te_) = ( p_);( p_)--;{ ls_ = te_; ++line_; }}
-	goto st58;
-tr79:
+	goto st10;
+tr13:
 /* #line 55 "tools\\bglgen\\meta\\lexer.rl" */
+	{( te_) = ( p_)+1;{ ls_ = te_; ++line_; }}
+	goto st10;
+tr23:
+/* #line 55 "tools\\bglgen\\meta\\lexer.rl" */
+	{( te_) = ( p_);( p_)--;{ ls_ = te_; ++line_; }}
+	goto st10;
+tr24:
+/* #line 60 "tools\\bglgen\\meta\\lexer.rl" */
 	{( te_) = ( p_);( p_)--;}
-	goto st58;
-tr82:
-/* #line 54 "tools\\bglgen\\meta\\lexer.rl" */
+	goto st10;
+tr27:
+/* #line 59 "tools\\bglgen\\meta\\lexer.rl" */
 	{( te_) = ( p_);( p_)--;}
-	goto st58;
-tr84:
-/* #line 53 "tools\\bglgen\\meta\\lexer.rl" */
+	goto st10;
+tr29:
+/* #line 58 "tools\\bglgen\\meta\\lexer.rl" */
 	{( te_) = ( p_)+1;{ comment_(); }}
-	goto st58;
-tr85:
-/* #line 52 "tools\\bglgen\\meta\\lexer.rl" */
+	goto st10;
+tr30:
+/* #line 57 "tools\\bglgen\\meta\\lexer.rl" */
 	{( te_) = ( p_);( p_)--;}
-	goto st58;
-tr88:
-/* #line 45 "tools\\bglgen\\meta\\lexer.rl" */
+	goto st10;
+tr37:
+/* #line 54 "tools\\bglgen\\meta\\lexer.rl" */
+	{( te_) = ( p_);( p_)--;{ bgl_malformed_(); }}
+	goto st10;
+tr73:
+/* #line 47 "tools\\bglgen\\meta\\lexer.rl" */
+	{( te_) = ( p_);( p_)--;}
+	goto st10;
+tr76:
+/* #line 48 "tools\\bglgen\\meta\\lexer.rl" */
 	{( te_) = ( p_);( p_)--;{ symbol_(); }}
-	goto st58;
-st58:
+	goto st10;
+st10:
 /* #line 1 "NONE" */
 	{( ts_) = 0;}
 	if ( ++( p_) == ( pe_) )
-		goto _test_eof58;
-case 58:
+		goto _test_eof10;
+case 10:
 /* #line 1 "NONE" */
 	{( ts_) = ( p_);}
-/* #line 106 "tools\\bglgen\\src\\lexer.cpp" */
+/* #line 114 "tools\\bglgen\\src\\lexer.cpp" */
 	switch( (*( p_)) ) {
-		case 10: goto tr67;
-		case 13: goto st60;
-		case 34: goto tr69;
-		case 35: goto tr70;
-		case 47: goto st63;
-		case 71: goto st67;
-		case 76: goto tr73;
-		case 82: goto tr73;
-		case 85: goto tr73;
-		case 92: goto st71;
-		case 96: goto tr66;
-		case 103: goto st72;
-		case 117: goto tr76;
+		case 10: goto tr13;
+		case 13: goto st11;
+		case 34: goto tr15;
+		case 47: goto st13;
+		case 71: goto st54;
+		case 76: goto tr19;
+		case 82: goto tr19;
+		case 85: goto tr19;
+		case 92: goto st58;
+		case 95: goto st53;
+		case 103: goto st59;
+		case 117: goto tr22;
 	}
-	if ( (*( p_)) < 91 ) {
-		if ( 0 <= (*( p_)) && (*( p_)) <= 64 )
-			goto tr66;
-	} else if ( (*( p_)) > 94 ) {
-		if ( 123 <= (*( p_)) )
-			goto tr66;
-	} else
-		goto tr66;
-	goto st59;
-st59:
+	if ( (*( p_)) > 90 ) {
+		if ( 97 <= (*( p_)) && (*( p_)) <= 122 )
+			goto st53;
+	} else if ( (*( p_)) >= 65 )
+		goto st53;
+	goto tr12;
+st11:
 	if ( ++( p_) == ( pe_) )
-		goto _test_eof59;
-case 59:
-	if ( (*( p_)) == 96 )
-		goto tr77;
-	if ( (*( p_)) < 58 ) {
-		if ( 0 <= (*( p_)) && (*( p_)) <= 47 )
-			goto tr77;
-	} else if ( (*( p_)) > 64 ) {
-		if ( (*( p_)) > 94 ) {
-			if ( 123 <= (*( p_)) )
-				goto tr77;
-		} else if ( (*( p_)) >= 91 )
-			goto tr77;
-	} else
-		goto tr77;
-	goto st59;
-st60:
-	if ( ++( p_) == ( pe_) )
-		goto _test_eof60;
-case 60:
+		goto _test_eof11;
+case 11:
 	if ( (*( p_)) == 10 )
-		goto tr67;
-	goto tr78;
-tr69:
+		goto tr13;
+	goto tr23;
+tr15:
 /* #line 1 "NONE" */
 	{( te_) = ( p_)+1;}
-/* #line 55 "tools\\bglgen\\meta\\lexer.rl" */
-	{act = 12;}
-	goto st61;
-st61:
+/* #line 60 "tools\\bglgen\\meta\\lexer.rl" */
+	{act = 14;}
+	goto st12;
+st12:
 	if ( ++( p_) == ( pe_) )
-		goto _test_eof61;
-case 61:
-/* #line 163 "tools\\bglgen\\src\\lexer.cpp" */
+		goto _test_eof12;
+case 12:
+/* #line 149 "tools\\bglgen\\src\\lexer.cpp" */
 	switch( (*( p_)) ) {
-		case 10: goto tr79;
+		case 10: goto tr24;
 		case 34: goto tr2;
-		case 36: goto tr79;
-		case 64: goto tr79;
+		case 36: goto tr24;
+		case 64: goto tr24;
 		case 92: goto st1;
-		case 96: goto tr79;
-		case 127: goto tr79;
+		case 96: goto tr24;
+		case 127: goto tr24;
 	}
 	if ( (*( p_)) > 8 ) {
 		if ( 13 <= (*( p_)) && (*( p_)) <= 31 )
-			goto tr79;
+			goto tr24;
 	} else if ( (*( p_)) >= 0 )
-		goto tr79;
+		goto tr24;
 	goto st0;
 st0:
 	if ( ++( p_) == ( pe_) )
@@ -356,630 +338,650 @@ case 9:
 	} else
 		goto st0;
 	goto tr0;
-tr70:
-/* #line 1 "NONE" */
-	{( te_) = ( p_)+1;}
-	goto st62;
-st62:
-	if ( ++( p_) == ( pe_) )
-		goto _test_eof62;
-case 62:
-/* #line 333 "tools\\bglgen\\src\\lexer.cpp" */
-	switch( (*( p_)) ) {
-		case 9: goto st10;
-		case 32: goto st10;
-		case 112: goto st11;
-	}
-	goto tr79;
-st10:
-	if ( ++( p_) == ( pe_) )
-		goto _test_eof10;
-case 10:
-	switch( (*( p_)) ) {
-		case 9: goto st10;
-		case 32: goto st10;
-		case 112: goto st11;
-	}
-	goto tr12;
-st11:
-	if ( ++( p_) == ( pe_) )
-		goto _test_eof11;
-case 11:
-	if ( (*( p_)) == 114 )
-		goto st12;
-	goto tr12;
-st12:
-	if ( ++( p_) == ( pe_) )
-		goto _test_eof12;
-case 12:
-	if ( (*( p_)) == 97 )
-		goto st13;
-	goto tr12;
 st13:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof13;
 case 13:
-	if ( (*( p_)) == 103 )
-		goto st14;
-	goto tr12;
+	switch( (*( p_)) ) {
+		case 42: goto st14;
+		case 47: goto st16;
+	}
+	goto tr24;
 st14:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof14;
 case 14:
-	if ( (*( p_)) == 109 )
+	if ( (*( p_)) == 42 )
 		goto st15;
-	goto tr12;
+	goto st14;
 st15:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof15;
 case 15:
-	if ( (*( p_)) == 97 )
-		goto st16;
-	goto tr12;
+	switch( (*( p_)) ) {
+		case 42: goto st15;
+		case 47: goto tr29;
+	}
+	goto st14;
 st16:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof16;
 case 16:
 	switch( (*( p_)) ) {
-		case 9: goto st17;
-		case 32: goto st17;
+		case 9: goto st16;
+		case 10: goto tr30;
+		case 13: goto tr30;
+		case 32: goto st16;
+		case 35: goto st18;
 	}
-	goto tr12;
+	goto tr31;
+tr31:
+/* #line 1 "NONE" */
+	{( te_) = ( p_)+1;}
+/* #line 57 "tools\\bglgen\\meta\\lexer.rl" */
+	{act = 11;}
+	goto st17;
+tr51:
+/* #line 1 "NONE" */
+	{( te_) = ( p_)+1;}
+/* #line 50 "tools\\bglgen\\meta\\lexer.rl" */
+	{act = 4;}
+	goto st17;
+tr54:
+/* #line 1 "NONE" */
+	{( te_) = ( p_)+1;}
+/* #line 49 "tools\\bglgen\\meta\\lexer.rl" */
+	{act = 3;}
+	goto st17;
+tr62:
+/* #line 1 "NONE" */
+	{( te_) = ( p_)+1;}
+/* #line 51 "tools\\bglgen\\meta\\lexer.rl" */
+	{act = 5;}
+	goto st17;
+tr72:
+/* #line 1 "NONE" */
+	{( te_) = ( p_)+1;}
+/* #line 52 "tools\\bglgen\\meta\\lexer.rl" */
+	{act = 6;}
+	goto st17;
 st17:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof17;
 case 17:
+/* #line 373 "tools\\bglgen\\src\\lexer.cpp" */
 	switch( (*( p_)) ) {
-		case 9: goto st17;
-		case 32: goto st17;
-		case 99: goto st18;
+		case 10: goto tr0;
+		case 13: goto tr0;
 	}
-	goto tr12;
+	goto tr31;
 st18:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof18;
 case 18:
-	if ( (*( p_)) == 111 )
-		goto st19;
-	goto tr12;
+	switch( (*( p_)) ) {
+		case 10: goto tr30;
+		case 13: goto tr30;
+		case 98: goto st19;
+	}
+	goto tr31;
 st19:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof19;
 case 19:
-	if ( (*( p_)) == 109 )
-		goto st20;
-	goto tr12;
+	switch( (*( p_)) ) {
+		case 10: goto tr30;
+		case 13: goto tr30;
+		case 103: goto st20;
+	}
+	goto tr31;
 st20:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof20;
 case 20:
-	if ( (*( p_)) == 109 )
-		goto st21;
-	goto tr12;
+	switch( (*( p_)) ) {
+		case 10: goto tr30;
+		case 13: goto tr30;
+		case 108: goto st21;
+	}
+	goto tr31;
 st21:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof21;
 case 21:
-	if ( (*( p_)) == 101 )
-		goto st22;
-	goto tr12;
+	switch( (*( p_)) ) {
+		case 9: goto st22;
+		case 10: goto tr30;
+		case 13: goto tr30;
+		case 32: goto st22;
+	}
+	goto tr31;
 st22:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof22;
 case 22:
-	if ( (*( p_)) == 110 )
-		goto st23;
-	goto tr12;
+	switch( (*( p_)) ) {
+		case 9: goto st22;
+		case 10: goto tr37;
+		case 13: goto tr37;
+		case 32: goto st22;
+		case 99: goto st23;
+		case 115: goto st33;
+		case 117: goto st36;
+		case 119: goto st44;
+	}
+	goto tr31;
 st23:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof23;
 case 23:
-	if ( (*( p_)) == 116 )
-		goto st24;
-	goto tr12;
+	switch( (*( p_)) ) {
+		case 10: goto tr30;
+		case 13: goto tr30;
+		case 104: goto st24;
+	}
+	goto tr31;
 st24:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof24;
 case 24:
 	switch( (*( p_)) ) {
-		case 9: goto st24;
-		case 32: goto st24;
-		case 40: goto st25;
+		case 10: goto tr30;
+		case 13: goto tr30;
+		case 101: goto st25;
 	}
-	goto tr12;
+	goto tr31;
 st25:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof25;
 case 25:
 	switch( (*( p_)) ) {
-		case 9: goto st25;
-		case 32: goto st25;
-		case 98: goto st26;
+		case 10: goto tr30;
+		case 13: goto tr30;
+		case 99: goto st26;
 	}
-	goto tr12;
+	goto tr31;
 st26:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof26;
 case 26:
-	if ( (*( p_)) == 103 )
-		goto st27;
-	goto tr12;
+	switch( (*( p_)) ) {
+		case 10: goto tr30;
+		case 13: goto tr30;
+		case 107: goto st27;
+	}
+	goto tr31;
 st27:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof27;
 case 27:
-	if ( (*( p_)) == 108 )
-		goto st28;
-	goto tr12;
+	switch( (*( p_)) ) {
+		case 10: goto tr30;
+		case 13: goto tr30;
+		case 101: goto st28;
+	}
+	goto tr31;
 st28:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof28;
 case 28:
 	switch( (*( p_)) ) {
-		case 9: goto st28;
-		case 32: goto st28;
-		case 44: goto st29;
+		case 10: goto tr30;
+		case 13: goto tr30;
+		case 100: goto st29;
 	}
-	goto tr12;
+	goto tr31;
 st29:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof29;
 case 29:
 	switch( (*( p_)) ) {
 		case 9: goto st29;
+		case 10: goto tr30;
+		case 13: goto tr30;
 		case 32: goto st29;
-		case 99: goto st30;
-		case 117: goto st40;
-		case 119: goto st49;
+		case 40: goto st30;
 	}
-	goto tr12;
+	goto tr31;
 st30:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof30;
 case 30:
-	if ( (*( p_)) == 104 )
+	switch( (*( p_)) ) {
+		case 9: goto st30;
+		case 10: goto tr30;
+		case 13: goto tr30;
+		case 32: goto st30;
+		case 95: goto st31;
+	}
+	if ( (*( p_)) < 48 ) {
+		if ( 45 <= (*( p_)) && (*( p_)) <= 46 )
+			goto st31;
+	} else if ( (*( p_)) > 57 ) {
+		if ( (*( p_)) > 90 ) {
+			if ( 97 <= (*( p_)) && (*( p_)) <= 122 )
+				goto st31;
+		} else if ( (*( p_)) >= 65 )
+			goto st31;
+	} else
 		goto st31;
-	goto tr12;
+	goto tr31;
 st31:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof31;
 case 31:
-	if ( (*( p_)) == 101 )
-		goto st32;
-	goto tr12;
+	switch( (*( p_)) ) {
+		case 9: goto st32;
+		case 10: goto tr30;
+		case 13: goto tr30;
+		case 32: goto st32;
+		case 41: goto tr51;
+		case 95: goto st31;
+	}
+	if ( (*( p_)) < 48 ) {
+		if ( 45 <= (*( p_)) && (*( p_)) <= 46 )
+			goto st31;
+	} else if ( (*( p_)) > 57 ) {
+		if ( (*( p_)) > 90 ) {
+			if ( 97 <= (*( p_)) && (*( p_)) <= 122 )
+				goto st31;
+		} else if ( (*( p_)) >= 65 )
+			goto st31;
+	} else
+		goto st31;
+	goto tr31;
 st32:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof32;
 case 32:
-	if ( (*( p_)) == 99 )
-		goto st33;
-	goto tr12;
+	switch( (*( p_)) ) {
+		case 9: goto st32;
+		case 10: goto tr30;
+		case 13: goto tr30;
+		case 32: goto st32;
+		case 41: goto tr51;
+	}
+	goto tr31;
 st33:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof33;
 case 33:
-	if ( (*( p_)) == 107 )
-		goto st34;
-	goto tr12;
+	switch( (*( p_)) ) {
+		case 10: goto tr30;
+		case 13: goto tr30;
+		case 116: goto st34;
+	}
+	goto tr31;
 st34:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof34;
 case 34:
-	if ( (*( p_)) == 101 )
-		goto st35;
-	goto tr12;
+	switch( (*( p_)) ) {
+		case 10: goto tr30;
+		case 13: goto tr30;
+		case 111: goto st35;
+	}
+	goto tr31;
 st35:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof35;
 case 35:
-	if ( (*( p_)) == 100 )
-		goto st36;
-	goto tr12;
+	switch( (*( p_)) ) {
+		case 10: goto tr30;
+		case 13: goto tr30;
+		case 112: goto tr54;
+	}
+	goto tr31;
 st36:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof36;
 case 36:
 	switch( (*( p_)) ) {
-		case 9: goto st36;
-		case 32: goto st36;
-		case 44: goto st37;
+		case 10: goto tr30;
+		case 13: goto tr30;
+		case 110: goto st37;
 	}
-	goto tr12;
+	goto tr31;
 st37:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof37;
 case 37:
 	switch( (*( p_)) ) {
-		case 9: goto st37;
-		case 32: goto st37;
-		case 96: goto tr12;
+		case 10: goto tr30;
+		case 13: goto tr30;
+		case 99: goto st38;
 	}
-	if ( (*( p_)) < 91 ) {
-		if ( 0 <= (*( p_)) && (*( p_)) <= 64 )
-			goto tr12;
-	} else if ( (*( p_)) > 94 ) {
-		if ( 123 <= (*( p_)) )
-			goto tr12;
-	} else
-		goto tr12;
-	goto st38;
+	goto tr31;
 st38:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof38;
 case 38:
 	switch( (*( p_)) ) {
-		case 9: goto st39;
-		case 32: goto st39;
-		case 41: goto tr45;
-		case 96: goto tr12;
+		case 10: goto tr30;
+		case 13: goto tr30;
+		case 104: goto st39;
 	}
-	if ( (*( p_)) < 58 ) {
-		if ( 0 <= (*( p_)) && (*( p_)) <= 47 )
-			goto tr12;
-	} else if ( (*( p_)) > 64 ) {
-		if ( (*( p_)) > 94 ) {
-			if ( 123 <= (*( p_)) )
-				goto tr12;
-		} else if ( (*( p_)) >= 91 )
-			goto tr12;
-	} else
-		goto tr12;
-	goto st38;
+	goto tr31;
 st39:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof39;
 case 39:
 	switch( (*( p_)) ) {
-		case 9: goto st39;
-		case 32: goto st39;
-		case 41: goto tr45;
+		case 10: goto tr30;
+		case 13: goto tr30;
+		case 101: goto st40;
 	}
-	goto tr12;
+	goto tr31;
 st40:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof40;
 case 40:
-	if ( (*( p_)) == 110 )
-		goto st41;
-	goto tr12;
+	switch( (*( p_)) ) {
+		case 10: goto tr30;
+		case 13: goto tr30;
+		case 99: goto st41;
+	}
+	goto tr31;
 st41:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof41;
 case 41:
-	if ( (*( p_)) == 99 )
-		goto st42;
-	goto tr12;
+	switch( (*( p_)) ) {
+		case 10: goto tr30;
+		case 13: goto tr30;
+		case 107: goto st42;
+	}
+	goto tr31;
 st42:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof42;
 case 42:
-	if ( (*( p_)) == 104 )
-		goto st43;
-	goto tr12;
+	switch( (*( p_)) ) {
+		case 10: goto tr30;
+		case 13: goto tr30;
+		case 101: goto st43;
+	}
+	goto tr31;
 st43:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof43;
 case 43:
-	if ( (*( p_)) == 101 )
-		goto st44;
-	goto tr12;
+	switch( (*( p_)) ) {
+		case 10: goto tr30;
+		case 13: goto tr30;
+		case 100: goto tr62;
+	}
+	goto tr31;
 st44:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof44;
 case 44:
-	if ( (*( p_)) == 99 )
-		goto st45;
-	goto tr12;
+	switch( (*( p_)) ) {
+		case 10: goto tr30;
+		case 13: goto tr30;
+		case 101: goto st45;
+	}
+	goto tr31;
 st45:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof45;
 case 45:
-	if ( (*( p_)) == 107 )
-		goto st46;
-	goto tr12;
+	switch( (*( p_)) ) {
+		case 10: goto tr30;
+		case 13: goto tr30;
+		case 105: goto st46;
+	}
+	goto tr31;
 st46:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof46;
 case 46:
-	if ( (*( p_)) == 101 )
-		goto st47;
-	goto tr12;
+	switch( (*( p_)) ) {
+		case 10: goto tr30;
+		case 13: goto tr30;
+		case 103: goto st47;
+	}
+	goto tr31;
 st47:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof47;
 case 47:
-	if ( (*( p_)) == 100 )
-		goto st48;
-	goto tr12;
+	switch( (*( p_)) ) {
+		case 10: goto tr30;
+		case 13: goto tr30;
+		case 104: goto st48;
+	}
+	goto tr31;
 st48:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof48;
 case 48:
 	switch( (*( p_)) ) {
-		case 9: goto st48;
-		case 32: goto st48;
-		case 41: goto tr54;
+		case 10: goto tr30;
+		case 13: goto tr30;
+		case 116: goto tr67;
 	}
-	goto tr12;
+	goto tr31;
+tr68:
+/* #line 1 "NONE" */
+	{( te_) = ( p_)+1;}
+/* #line 57 "tools\\bglgen\\meta\\lexer.rl" */
+	{act = 11;}
+	goto st49;
+tr67:
+/* #line 1 "NONE" */
+	{( te_) = ( p_)+1;}
+/* #line 53 "tools\\bglgen\\meta\\lexer.rl" */
+	{act = 7;}
+	goto st49;
 st49:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof49;
 case 49:
-	if ( (*( p_)) == 101 )
-		goto st50;
-	goto tr12;
+/* #line 737 "tools\\bglgen\\src\\lexer.cpp" */
+	switch( (*( p_)) ) {
+		case 9: goto tr68;
+		case 10: goto tr0;
+		case 13: goto tr0;
+		case 32: goto tr68;
+		case 40: goto st50;
+	}
+	goto tr31;
 st50:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof50;
 case 50:
-	if ( (*( p_)) == 105 )
+	switch( (*( p_)) ) {
+		case 9: goto st50;
+		case 10: goto tr30;
+		case 13: goto tr30;
+		case 32: goto st50;
+	}
+	if ( 48 <= (*( p_)) && (*( p_)) <= 57 )
 		goto st51;
-	goto tr12;
+	goto tr31;
 st51:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof51;
 case 51:
-	if ( (*( p_)) == 103 )
-		goto st52;
-	goto tr12;
+	switch( (*( p_)) ) {
+		case 9: goto st52;
+		case 10: goto tr30;
+		case 13: goto tr30;
+		case 32: goto st52;
+		case 41: goto tr72;
+	}
+	if ( 48 <= (*( p_)) && (*( p_)) <= 57 )
+		goto st51;
+	goto tr31;
 st52:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof52;
 case 52:
-	if ( (*( p_)) == 104 )
-		goto st53;
-	goto tr12;
+	switch( (*( p_)) ) {
+		case 9: goto st52;
+		case 10: goto tr30;
+		case 13: goto tr30;
+		case 32: goto st52;
+		case 41: goto tr72;
+	}
+	goto tr31;
 st53:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof53;
 case 53:
-	if ( (*( p_)) == 116 )
-		goto st54;
-	goto tr12;
+	if ( (*( p_)) == 95 )
+		goto st53;
+	if ( (*( p_)) < 65 ) {
+		if ( 48 <= (*( p_)) && (*( p_)) <= 57 )
+			goto st53;
+	} else if ( (*( p_)) > 90 ) {
+		if ( 97 <= (*( p_)) && (*( p_)) <= 122 )
+			goto st53;
+	} else
+		goto st53;
+	goto tr73;
 st54:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof54;
 case 54:
 	switch( (*( p_)) ) {
-		case 9: goto st54;
-		case 32: goto st54;
-		case 41: goto tr60;
-		case 44: goto st55;
+		case 76: goto st55;
+		case 95: goto st53;
 	}
-	goto tr12;
+	if ( (*( p_)) < 65 ) {
+		if ( 48 <= (*( p_)) && (*( p_)) <= 57 )
+			goto st53;
+	} else if ( (*( p_)) > 90 ) {
+		if ( 97 <= (*( p_)) && (*( p_)) <= 122 )
+			goto st53;
+	} else
+		goto st53;
+	goto tr73;
 st55:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof55;
 case 55:
-	switch( (*( p_)) ) {
-		case 9: goto st55;
-		case 32: goto st55;
-	}
-	if ( 48 <= (*( p_)) && (*( p_)) <= 57 )
+	if ( (*( p_)) == 95 )
 		goto st56;
-	goto tr12;
+	if ( (*( p_)) < 65 ) {
+		if ( 48 <= (*( p_)) && (*( p_)) <= 57 )
+			goto st53;
+	} else if ( (*( p_)) > 90 ) {
+		if ( 97 <= (*( p_)) && (*( p_)) <= 122 )
+			goto st53;
+	} else
+		goto st53;
+	goto tr73;
 st56:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof56;
 case 56:
-	switch( (*( p_)) ) {
-		case 9: goto st57;
-		case 32: goto st57;
-		case 41: goto tr64;
-	}
-	if ( 48 <= (*( p_)) && (*( p_)) <= 57 )
+	if ( (*( p_)) == 95 )
 		goto st56;
-	goto tr12;
+	if ( (*( p_)) < 65 ) {
+		if ( 48 <= (*( p_)) && (*( p_)) <= 57 )
+			goto st56;
+	} else if ( (*( p_)) > 90 ) {
+		if ( 97 <= (*( p_)) && (*( p_)) <= 122 )
+			goto st56;
+	} else
+		goto st56;
+	goto tr76;
+tr19:
+/* #line 1 "NONE" */
+	{( te_) = ( p_)+1;}
+/* #line 47 "tools\\bglgen\\meta\\lexer.rl" */
+	{act = 1;}
+	goto st57;
 st57:
 	if ( ++( p_) == ( pe_) )
 		goto _test_eof57;
 case 57:
-	switch( (*( p_)) ) {
-		case 9: goto st57;
-		case 32: goto st57;
-		case 41: goto tr64;
-	}
-	goto tr12;
-st63:
-	if ( ++( p_) == ( pe_) )
-		goto _test_eof63;
-case 63:
-	switch( (*( p_)) ) {
-		case 42: goto st64;
-		case 47: goto st66;
-	}
-	goto tr79;
-st64:
-	if ( ++( p_) == ( pe_) )
-		goto _test_eof64;
-case 64:
-	if ( (*( p_)) == 42 )
-		goto st65;
-	goto st64;
-st65:
-	if ( ++( p_) == ( pe_) )
-		goto _test_eof65;
-case 65:
-	switch( (*( p_)) ) {
-		case 42: goto st65;
-		case 47: goto tr84;
-	}
-	goto st64;
-st66:
-	if ( ++( p_) == ( pe_) )
-		goto _test_eof66;
-case 66:
-	switch( (*( p_)) ) {
-		case 10: goto tr85;
-		case 13: goto tr85;
-	}
-	goto st66;
-st67:
-	if ( ++( p_) == ( pe_) )
-		goto _test_eof67;
-case 67:
-	switch( (*( p_)) ) {
-		case 76: goto st68;
-		case 96: goto tr77;
-	}
-	if ( (*( p_)) < 58 ) {
-		if ( 0 <= (*( p_)) && (*( p_)) <= 47 )
-			goto tr77;
-	} else if ( (*( p_)) > 64 ) {
-		if ( (*( p_)) > 94 ) {
-			if ( 123 <= (*( p_)) )
-				goto tr77;
-		} else if ( (*( p_)) >= 91 )
-			goto tr77;
-	} else
-		goto tr77;
-	goto st59;
-st68:
-	if ( ++( p_) == ( pe_) )
-		goto _test_eof68;
-case 68:
-	if ( (*( p_)) == 95 )
-		goto st69;
-	if ( (*( p_)) < 58 ) {
-		if ( 0 <= (*( p_)) && (*( p_)) <= 47 )
-			goto tr77;
-	} else if ( (*( p_)) > 64 ) {
-		if ( (*( p_)) > 96 ) {
-			if ( 123 <= (*( p_)) )
-				goto tr77;
-		} else if ( (*( p_)) >= 91 )
-			goto tr77;
-	} else
-		goto tr77;
-	goto st59;
-st69:
-	if ( ++( p_) == ( pe_) )
-		goto _test_eof69;
-case 69:
-	if ( (*( p_)) == 96 )
-		goto tr88;
-	if ( (*( p_)) < 58 ) {
-		if ( 0 <= (*( p_)) && (*( p_)) <= 47 )
-			goto tr88;
-	} else if ( (*( p_)) > 64 ) {
-		if ( (*( p_)) > 94 ) {
-			if ( 123 <= (*( p_)) )
-				goto tr88;
-		} else if ( (*( p_)) >= 91 )
-			goto tr88;
-	} else
-		goto tr88;
-	goto st69;
-tr73:
-/* #line 1 "NONE" */
-	{( te_) = ( p_)+1;}
-/* #line 44 "tools\\bglgen\\meta\\lexer.rl" */
-	{act = 1;}
-	goto st70;
-st70:
-	if ( ++( p_) == ( pe_) )
-		goto _test_eof70;
-case 70:
-/* #line 846 "tools\\bglgen\\src\\lexer.cpp" */
+/* #line 854 "tools\\bglgen\\src\\lexer.cpp" */
 	switch( (*( p_)) ) {
 		case 34: goto st0;
-		case 96: goto tr77;
+		case 95: goto st53;
 	}
-	if ( (*( p_)) < 58 ) {
-		if ( 0 <= (*( p_)) && (*( p_)) <= 47 )
-			goto tr77;
-	} else if ( (*( p_)) > 64 ) {
-		if ( (*( p_)) > 94 ) {
-			if ( 123 <= (*( p_)) )
-				goto tr77;
-		} else if ( (*( p_)) >= 91 )
-			goto tr77;
-	} else
-		goto tr77;
-	goto st59;
-st71:
-	if ( ++( p_) == ( pe_) )
-		goto _test_eof71;
-case 71:
-	switch( (*( p_)) ) {
-		case 10: goto tr67;
-		case 13: goto st60;
-	}
-	goto tr79;
-st72:
-	if ( ++( p_) == ( pe_) )
-		goto _test_eof72;
-case 72:
-	switch( (*( p_)) ) {
-		case 96: goto tr77;
-		case 108: goto st73;
-	}
-	if ( (*( p_)) < 58 ) {
-		if ( 0 <= (*( p_)) && (*( p_)) <= 47 )
-			goto tr77;
-	} else if ( (*( p_)) > 64 ) {
-		if ( (*( p_)) > 94 ) {
-			if ( 123 <= (*( p_)) )
-				goto tr77;
-		} else if ( (*( p_)) >= 91 )
-			goto tr77;
-	} else
-		goto tr77;
-	goto st59;
-st73:
-	if ( ++( p_) == ( pe_) )
-		goto _test_eof73;
-case 73:
-	if ( (*( p_)) == 96 )
-		goto tr77;
 	if ( (*( p_)) < 65 ) {
-		if ( (*( p_)) > 47 ) {
-			if ( 58 <= (*( p_)) && (*( p_)) <= 64 )
-				goto tr77;
-		} else if ( (*( p_)) >= 0 )
-			goto tr77;
+		if ( 48 <= (*( p_)) && (*( p_)) <= 57 )
+			goto st53;
 	} else if ( (*( p_)) > 90 ) {
-		if ( (*( p_)) > 94 ) {
-			if ( 123 <= (*( p_)) )
-				goto tr77;
-		} else if ( (*( p_)) >= 91 )
-			goto tr77;
+		if ( 97 <= (*( p_)) && (*( p_)) <= 122 )
+			goto st53;
 	} else
-		goto st69;
-	goto st59;
-tr76:
+		goto st53;
+	goto tr73;
+st58:
+	if ( ++( p_) == ( pe_) )
+		goto _test_eof58;
+case 58:
+	switch( (*( p_)) ) {
+		case 10: goto tr13;
+		case 13: goto st11;
+	}
+	goto tr24;
+st59:
+	if ( ++( p_) == ( pe_) )
+		goto _test_eof59;
+case 59:
+	switch( (*( p_)) ) {
+		case 95: goto st53;
+		case 108: goto st60;
+	}
+	if ( (*( p_)) < 65 ) {
+		if ( 48 <= (*( p_)) && (*( p_)) <= 57 )
+			goto st53;
+	} else if ( (*( p_)) > 90 ) {
+		if ( 97 <= (*( p_)) && (*( p_)) <= 122 )
+			goto st53;
+	} else
+		goto st53;
+	goto tr73;
+st60:
+	if ( ++( p_) == ( pe_) )
+		goto _test_eof60;
+case 60:
+	if ( (*( p_)) == 95 )
+		goto st53;
+	if ( (*( p_)) < 65 ) {
+		if ( 48 <= (*( p_)) && (*( p_)) <= 57 )
+			goto st53;
+	} else if ( (*( p_)) > 90 ) {
+		if ( 97 <= (*( p_)) && (*( p_)) <= 122 )
+			goto st53;
+	} else
+		goto st56;
+	goto tr73;
+tr22:
 /* #line 1 "NONE" */
 	{( te_) = ( p_)+1;}
-/* #line 44 "tools\\bglgen\\meta\\lexer.rl" */
+/* #line 47 "tools\\bglgen\\meta\\lexer.rl" */
 	{act = 1;}
-	goto st74;
-st74:
+	goto st61;
+st61:
 	if ( ++( p_) == ( pe_) )
-		goto _test_eof74;
-case 74:
-/* #line 920 "tools\\bglgen\\src\\lexer.cpp" */
+		goto _test_eof61;
+case 61:
+/* #line 916 "tools\\bglgen\\src\\lexer.cpp" */
 	switch( (*( p_)) ) {
 		case 34: goto st0;
-		case 56: goto tr73;
-		case 96: goto tr77;
+		case 56: goto tr19;
+		case 95: goto st53;
 	}
-	if ( (*( p_)) < 58 ) {
-		if ( 0 <= (*( p_)) && (*( p_)) <= 47 )
-			goto tr77;
-	} else if ( (*( p_)) > 64 ) {
-		if ( (*( p_)) > 94 ) {
-			if ( 123 <= (*( p_)) )
-				goto tr77;
-		} else if ( (*( p_)) >= 91 )
-			goto tr77;
+	if ( (*( p_)) < 65 ) {
+		if ( 48 <= (*( p_)) && (*( p_)) <= 57 )
+			goto st53;
+	} else if ( (*( p_)) > 90 ) {
+		if ( 97 <= (*( p_)) && (*( p_)) <= 122 )
+			goto st53;
 	} else
-		goto tr77;
-	goto st59;
+		goto st53;
+	goto tr73;
 	}
-	_test_eof58: cs = 58; goto _test_eof; 
-	_test_eof59: cs = 59; goto _test_eof; 
-	_test_eof60: cs = 60; goto _test_eof; 
-	_test_eof61: cs = 61; goto _test_eof; 
+	_test_eof10: cs = 10; goto _test_eof; 
+	_test_eof11: cs = 11; goto _test_eof; 
+	_test_eof12: cs = 12; goto _test_eof; 
 	_test_eof0: cs = 0; goto _test_eof; 
 	_test_eof1: cs = 1; goto _test_eof; 
 	_test_eof2: cs = 2; goto _test_eof; 
@@ -990,10 +992,6 @@ case 74:
 	_test_eof7: cs = 7; goto _test_eof; 
 	_test_eof8: cs = 8; goto _test_eof; 
 	_test_eof9: cs = 9; goto _test_eof; 
-	_test_eof62: cs = 62; goto _test_eof; 
-	_test_eof10: cs = 10; goto _test_eof; 
-	_test_eof11: cs = 11; goto _test_eof; 
-	_test_eof12: cs = 12; goto _test_eof; 
 	_test_eof13: cs = 13; goto _test_eof; 
 	_test_eof14: cs = 14; goto _test_eof; 
 	_test_eof15: cs = 15; goto _test_eof; 
@@ -1039,26 +1037,17 @@ case 74:
 	_test_eof55: cs = 55; goto _test_eof; 
 	_test_eof56: cs = 56; goto _test_eof; 
 	_test_eof57: cs = 57; goto _test_eof; 
-	_test_eof63: cs = 63; goto _test_eof; 
-	_test_eof64: cs = 64; goto _test_eof; 
-	_test_eof65: cs = 65; goto _test_eof; 
-	_test_eof66: cs = 66; goto _test_eof; 
-	_test_eof67: cs = 67; goto _test_eof; 
-	_test_eof68: cs = 68; goto _test_eof; 
-	_test_eof69: cs = 69; goto _test_eof; 
-	_test_eof70: cs = 70; goto _test_eof; 
-	_test_eof71: cs = 71; goto _test_eof; 
-	_test_eof72: cs = 72; goto _test_eof; 
-	_test_eof73: cs = 73; goto _test_eof; 
-	_test_eof74: cs = 74; goto _test_eof; 
+	_test_eof58: cs = 58; goto _test_eof; 
+	_test_eof59: cs = 59; goto _test_eof; 
+	_test_eof60: cs = 60; goto _test_eof; 
+	_test_eof61: cs = 61; goto _test_eof; 
 
 	_test_eof: {}
 	if ( ( p_) == eof )
 	{
 	switch ( cs ) {
-	case 59: goto tr77;
-	case 60: goto tr78;
-	case 61: goto tr79;
+	case 11: goto tr23;
+	case 12: goto tr24;
 	case 0: goto tr0;
 	case 1: goto tr0;
 	case 2: goto tr0;
@@ -1069,73 +1058,61 @@ case 74:
 	case 7: goto tr0;
 	case 8: goto tr0;
 	case 9: goto tr0;
-	case 62: goto tr79;
-	case 10: goto tr12;
-	case 11: goto tr12;
-	case 12: goto tr12;
-	case 13: goto tr12;
-	case 14: goto tr12;
-	case 15: goto tr12;
-	case 16: goto tr12;
-	case 17: goto tr12;
-	case 18: goto tr12;
-	case 19: goto tr12;
-	case 20: goto tr12;
-	case 21: goto tr12;
-	case 22: goto tr12;
-	case 23: goto tr12;
-	case 24: goto tr12;
-	case 25: goto tr12;
-	case 26: goto tr12;
-	case 27: goto tr12;
-	case 28: goto tr12;
-	case 29: goto tr12;
-	case 30: goto tr12;
-	case 31: goto tr12;
-	case 32: goto tr12;
-	case 33: goto tr12;
-	case 34: goto tr12;
-	case 35: goto tr12;
-	case 36: goto tr12;
-	case 37: goto tr12;
-	case 38: goto tr12;
-	case 39: goto tr12;
-	case 40: goto tr12;
-	case 41: goto tr12;
-	case 42: goto tr12;
-	case 43: goto tr12;
-	case 44: goto tr12;
-	case 45: goto tr12;
-	case 46: goto tr12;
-	case 47: goto tr12;
-	case 48: goto tr12;
-	case 49: goto tr12;
-	case 50: goto tr12;
-	case 51: goto tr12;
-	case 52: goto tr12;
-	case 53: goto tr12;
-	case 54: goto tr12;
-	case 55: goto tr12;
-	case 56: goto tr12;
-	case 57: goto tr12;
-	case 63: goto tr79;
-	case 64: goto tr82;
-	case 65: goto tr82;
-	case 66: goto tr85;
-	case 67: goto tr77;
-	case 68: goto tr77;
-	case 69: goto tr88;
-	case 70: goto tr77;
-	case 71: goto tr79;
-	case 72: goto tr77;
-	case 73: goto tr77;
-	case 74: goto tr77;
+	case 13: goto tr24;
+	case 14: goto tr27;
+	case 15: goto tr27;
+	case 16: goto tr30;
+	case 17: goto tr0;
+	case 18: goto tr30;
+	case 19: goto tr30;
+	case 20: goto tr30;
+	case 21: goto tr30;
+	case 22: goto tr37;
+	case 23: goto tr30;
+	case 24: goto tr30;
+	case 25: goto tr30;
+	case 26: goto tr30;
+	case 27: goto tr30;
+	case 28: goto tr30;
+	case 29: goto tr30;
+	case 30: goto tr30;
+	case 31: goto tr30;
+	case 32: goto tr30;
+	case 33: goto tr30;
+	case 34: goto tr30;
+	case 35: goto tr30;
+	case 36: goto tr30;
+	case 37: goto tr30;
+	case 38: goto tr30;
+	case 39: goto tr30;
+	case 40: goto tr30;
+	case 41: goto tr30;
+	case 42: goto tr30;
+	case 43: goto tr30;
+	case 44: goto tr30;
+	case 45: goto tr30;
+	case 46: goto tr30;
+	case 47: goto tr30;
+	case 48: goto tr30;
+	case 49: goto tr0;
+	case 50: goto tr30;
+	case 51: goto tr30;
+	case 52: goto tr30;
+	case 53: goto tr73;
+	case 54: goto tr73;
+	case 55: goto tr73;
+	case 56: goto tr76;
+	case 57: goto tr73;
+	case 58: goto tr24;
+	case 59: goto tr73;
+	case 60: goto tr73;
+	case 61: goto tr73;
 	}
 	}
 
 	}
 
-/* #line 80 "tools\\bglgen\\meta\\lexer.rl" */
+/* #line 87 "tools\\bglgen\\meta\\lexer.rl" */
 
    if (cs == lexer_error) {
       throw std::runtime_error("Lexer error!");
@@ -1144,6 +1121,7 @@ case 74:
 
 ///////////////////////////////////////////////////////////////////////////////
 void Lexer::symbol_() {
+   if (ignore_symbols_) return;
    std::ptrdiff_t offset = ts_ - ps_;
    std::ptrdiff_t length = te_ - ts_;
    gsl::string_span<> symbol = input_.subspan(offset, length);
@@ -1162,7 +1140,7 @@ void Lexer::set_check_() {
       if (c >= 'a' && c <= 'z' ||
           c >= 'A' && c <= 'Z' ||
           c >= '0' && c <= '9' ||
-          c == '_') {
+          c == '_' || c == '.' || c == '-') {
          --begin;
       } else if (begin == end) {
          --begin;
@@ -1170,7 +1148,6 @@ void Lexer::set_check_() {
       } else {
          break;
       }
-      --it;
    }
 
    check_ = S(begin, end);
@@ -1230,6 +1207,18 @@ void Lexer::comment_() {
    if (ls > 0) {
       ls_ = ts_ + ls;
    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+void Lexer::bgl_malformed_() {
+   std::ptrdiff_t offset = ts_ - ps_;
+   std::ptrdiff_t length = te_ - ts_;
+   gsl::string_span<> symbol = input_.subspan(offset, length);
+   be_warn("") << "Malformed //#bgl declaration!"
+	  & attr("Declaration") << S(symbol.begin(), symbol.end())
+	  & attr("Path") << path_.generic_string()
+	  & attr("Line") << line_
+	  | default_log();
 }
 
 } // be::bglgen

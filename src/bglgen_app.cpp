@@ -1,23 +1,26 @@
 #include "bglgen_app.hpp"
 #include "lexer.hpp"
 #include "bglgen_lua.hpp"
+#include "bglgen_blt.hpp"
 #include "version.hpp"
 #include "gl_registry.hpp"
 #include <be/core/version.hpp>
-#include <be/cli/cli.hpp>
-#include <be/core/logging.hpp>
-#include <be/core/console_log_sink.hpp>
-#include <be/core/log_exception.hpp>
-#include <be/util/path_glob.hpp>
 #include <be/core/alg.hpp>
+#include <be/core/logging.hpp>
+#include <be/core/log_exception.hpp>
+#include <be/core/console_log_sink.hpp>
+#include <be/core/lua_modules.hpp>
+#include <be/util/path_glob.hpp>
+#include <be/util/get_file_contents.hpp>
+#include <be/util/lua_modules.hpp>
+#include <be/cli/cli.hpp>
+#include <be/blt/lua_modules.hpp>
 #include <be/belua/context.hpp>
 #include <be/belua/lua_helpers.hpp>
-#include <be/core/lua_modules.hpp>
-#include <be/blt/lua_modules.hpp>
-#include <be/util/lua_modules.hpp>
+#include <be/belua/log_exception.hpp>
 #include <be/sqlite/static_stmt_cache.hpp>
+#include <be/sqlite/transaction.hpp>
 #include <be/sqlite/log_exception.hpp>
-#include <be/util/get_file_contents.hpp>
 
 namespace be::bglgen {
 namespace {
@@ -29,6 +32,16 @@ S inflate_bglgen_core() {
    return util::inflate_string(data, BE_BGLGEN_COMPILED_LUA_MODULE_UNCOMPRESSED_LENGTH);
 #else
    return S(BE_BGLGEN_COMPILED_LUA_MODULE, BE_BGLGEN_COMPILED_LUA_MODULE_LENGTH);
+#endif
+}
+
+///////////////////////////////////////////////////////////////////////////////
+S inflate_bgl_default_template() {
+#ifdef BE_BGLGEN_BGL_DEFAULT_TEMPLATE_UNCOMPRESSED_LENGTH
+   Buf<const UC> data = make_buf(BE_BGLGEN_BGL_DEFAULT_TEMPLATE, BE_BGLGEN_BGL_DEFAULT_TEMPLATE_LENGTH);
+   return util::inflate_string(data, BE_BGLGEN_BGL_DEFAULT_TEMPLATE_UNCOMPRESSED_LENGTH);
+#else
+   return S(BE_BGLGEN_BGL_DEFAULT_TEMPLATE, BE_BGLGEN_BGL_DEFAULT_TEMPLATE_LENGTH);
 #endif
 }
 
@@ -136,687 +149,171 @@ void add_gl_data(lua_State* L, const char* global_name, bool sort_by_weight, std
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-sqlite::Db* registry = nullptr;
 sqlite::StaticStmtCache* cache = nullptr;
 
 /////////////////////////////////////////////////////////////////////////////////
-//int gl_registry_list_features(lua_State* L) {
-//   // get all feature names corresponding to a particular api
-//   const char* api_name = luaL_checkstring(L, 1);
-//   lua_settop(L, 1);
-//   lua_newtable(L); // 2
-//
-//   int index = 1;
-//   for (pugi::xml_node feature : registry.children("feature")) {
-//      if (0 == strcmp(api_name, feature.attribute("api").value())) {
-//         lua_pushstring(L, feature.attribute("name").value());
-//         lua_rawseti(L, 2, index);
-//         ++index;
-//      }
-//   }
-//
-//   return 1;
-//}
-//
-/////////////////////////////////////////////////////////////////////////////////
-//int gl_registry_list_extensions(lua_State* L) {
-//   // get all extension names corresponding to a particular api
-//   const char* api_name = luaL_checkstring(L, 1);
-//   lua_settop(L, 1);
-//   lua_newtable(L); // 2
-//
-//   int index = 1;
-//   for (pugi::xml_node extensions : registry.children("extensions")) {
-//      for (pugi::xml_node extension : extensions.children("extension")) {
-//         std::regex support_re(extension.attribute("supported").value());
-//         if (std::regex_match(api_name, support_re)) {
-//            lua_pushstring(L, extension.attribute("name").value());
-//            lua_rawseti(L, 2, index);
-//            ++index;
-//         }
-//      }
-//   }
-//
-//   return 1;
-//}
-//
-/////////////////////////////////////////////////////////////////////////////////
-//int gl_registry_get_feature(lua_State* L) {
-//   // get information about a specific feature.
-//   const char* feature_name = luaL_checkstring(L, 1);
-//
-//   S query_api;
-//   if (lua_gettop(L) > 1) {
-//      query_api = luaL_checkstring(L, 2);
-//   }
-//
-//   lua_settop(L, 1);
-//
-//   for (pugi::xml_node feature : registry.children("feature")) {
-//      if (0 == strcmp(feature_name, feature.attribute("name").value())) {
-//         if (!query_api.empty() && 0 != strcmp(query_api.c_str(), feature.attribute("api").value())) {
-//            return 0;
-//         }
-//
-//         /*
-//         {
-//            name = "GL_VERSION_1_1",
-//            number = "1.1",
-//            protect = "asdf",
-//            contents = {
-//               gl = {
-//                  _ = {
-//                     enums = {
-//                        GL_STENCIL_INDEX = true,
-//                        ...
-//                     },
-//                     commands = {
-//                        glGenerateMipmap = true,
-//                        ...
-//                     }
-//                  }
-//               }
-//            }
-//         }
-//         */
-//
-//         lua_createtable(L, 0, 4); // 2
-//
-//         lua_pushliteral(L, "name"); // 3
-//         lua_pushvalue(L, 1); // 4
-//         lua_rawset(L, 2);
-//
-//         lua_pushliteral(L, "number"); // 3
-//         lua_pushstring(L, feature.attribute("number").value()); // 4
-//         lua_rawset(L, 2);
-//
-//         if (pugi::xml_attribute protect = feature.attribute("protect"); !protect.empty()) {
-//            lua_pushliteral(L, "protect"); // 3
-//            lua_pushstring(L, protect.value()); // 4
-//            lua_rawset(L, 2);
-//         }
-//
-//         lua_pushliteral(L, "contents"); // 3
-//         lua_createtable(L, 0, 1); // 4
-//
-//         lua_pushstring(L, feature.attribute("api").value()); // 5
-//         lua_newtable(L); // 6
-//
-//         for (pugi::xml_node set : feature.children()) {
-//            bool remove;
-//            if (0 == strcmp(set.name(), "require")) {
-//               remove = false;
-//            } else if (0 == strcmp(set.name(), "remove")) {
-//               remove = true;
-//            } else {
-//               continue;
-//            }
-//
-//            const char* profile = set.attribute("profile").value();
-//            if (0 == strcmp(profile, "")) profile = "_";
-//
-//            lua_pushstring(L, profile); // 7
-//            if (LUA_TNIL == lua_rawget(L, 6)) { // 7
-//               lua_pop(L, 1);
-//               lua_createtable(L, 0, 3); // 7
-//               lua_pushstring(L, profile); // 8
-//               lua_pushvalue(L, 7); // 9
-//               lua_rawset(L, 6);
-//            }
-//
-//            for (pugi::xml_node item : set.children()) {
-//               const char* which;
-//               if (0 == strcmp(item.name(), "enum")) {
-//                  which = "enums";
-//               } else if (0 == strcmp(item.name(), "command")) {
-//                  which = "commands";
-//               } else if (0 == strcmp(item.name(), "type")) {
-//                  which = "types";
-//               } else {
-//                  continue;
-//               }
-//
-//               lua_pushstring(L, which); // 8
-//               if (LUA_TNIL == lua_rawget(L, 7)) { // 8
-//                  lua_pop(L, 1);
-//                  lua_newtable(L); // 8
-//                  lua_pushstring(L, which); // 9
-//                  lua_pushvalue(L, 8); // 10
-//                  lua_rawset(L, 7);
-//               }
-//
-//               lua_pushstring(L, item.attribute("name").value()); // 9
-//               lua_pushboolean(L, remove ? 0 : 1); // 10
-//               lua_rawset(L, 8);
-//
-//               lua_pop(L, 1);
-//            }
-//
-//            lua_pop(L, 1);
-//         }
-//
-//         lua_rawset(L, 4);
-//         lua_rawset(L, 2);
-//         return 1;
-//      }
-//   }
-//   return 0;
-//}
-//
-/////////////////////////////////////////////////////////////////////////////////
-//int gl_registry_get_extension(lua_State* L) {
-//   // get information about a specific extension.
-//   const char* extension_name = luaL_checkstring(L, 1);
-//
-//   S query_api;
-//   if (lua_gettop(L) > 1) {
-//      query_api = luaL_checkstring(L, 2);
-//   }
-//
-//   lua_settop(L, 1);
-//
-//   for (pugi::xml_node extensions : registry.children("extensions")) {
-//      for (pugi::xml_node extension : extensions.children("extension")) {
-//         if (0 == strcmp(extension_name, extension.attribute("name").value())) {
-//            S supported = extension.attribute("supported").value();
-//            if (!query_api.empty()) {
-//               std::regex supported_re(supported);
-//               if (!std::regex_match(query_api, supported_re)) {
-//                  return 0;
-//               }
-//            }
-//
-//            /*
-//            {
-//               name = "GL_KHR_debug",
-//               protect = "asdf",
-//               contents = {
-//                  gl = {
-//                     _ = {
-//                        enums = {
-//                           GL_STENCIL_INDEX = true,
-//                           ...
-//                        },
-//                        commands = {
-//                           glGenerateMipmap = true,
-//                           ...
-//                        }
-//                     }
-//                  },
-//                  gles = {
-//                     _ = {
-//                        enums = {
-//                           GL_STENCIL_INDEX = true,
-//                           ...
-//                        }
-//                     }
-//                  }
-//               }
-//            }
-//            */
-//
-//            lua_createtable(L, 0, 3); // 2
-//
-//            lua_pushliteral(L, "name"); // 3
-//            lua_pushvalue(L, 1); // 4
-//            lua_rawset(L, 2);
-//
-//            if (pugi::xml_attribute protect = extension.attribute("protect"); !protect.empty()) {
-//               lua_pushliteral(L, "protect"); // 3
-//               lua_pushstring(L, protect.value()); // 4
-//               lua_rawset(L, 2);
-//            }
-//
-//            lua_pushliteral(L, "contents"); // 3
-//            lua_createtable(L, 0, 1); // 4
-//
-//            std::vector<S> apis;
-//            if (!query_api.empty()) {
-//               apis.push_back(query_api);
-//            } else {
-//               std::size_t start = 0, end = 0;
-//               while ((end = supported.find('|', start)) != S::npos) {
-//                  apis.push_back(supported.substr(start, end - start));
-//                  start = end + 1;
-//               }
-//               apis.push_back(supported.substr(start));
-//            }
-//
-//            for (S& api : apis) {
-//               lua_pushstring(L, api.c_str()); // 5
-//               lua_newtable(L); // 6
-//               lua_rawset(L, 4);
-//            }
-//            
-//            for (pugi::xml_node set : extension.children()) {
-//               bool remove;
-//               if (0 == strcmp(set.name(), "require")) {
-//                  remove = false;
-//               } else if (0 == strcmp(set.name(), "remove")) {
-//                  remove = true;
-//               } else {
-//                  continue;
-//               }
-//
-//               const char* api = set.attribute("api").value();
-//               const char* profile = set.attribute("profile").value();
-//               if (0 == strcmp(profile, "")) profile = "_";
-//
-//               if (0 == strcmp(api, "")) {
-//                  lua_pushstring(L, api); // 5
-//                  if (LUA_TNIL != lua_rawget(L, 4)) { // 5
-//                     lua_pushstring(L, profile); // 6
-//                     if (LUA_TNIL == lua_rawget(L, 5)) { // 6
-//                        lua_pop(L, 1);
-//                        lua_newtable(L); // 6
-//                        lua_pushstring(L, profile); // 7
-//                        lua_pushvalue(L, 6); // 8
-//                        lua_rawset(L, 5);
-//                     }
-//
-//                     for (pugi::xml_node item : set.children()) {
-//                        const char* which;
-//                        if (0 == strcmp(item.name(), "enum")) {
-//                           which = "enums";
-//                        } else if (0 == strcmp(item.name(), "command")) {
-//                           which = "commands";
-//                        } else if (0 == strcmp(item.name(), "type")) {
-//                           which = "types";
-//                        } else {
-//                           continue;
-//                        }
-//
-//                        lua_pushstring(L, which); // 7
-//                        if (LUA_TNIL == lua_rawget(L, 6)) { // 7
-//                           lua_pop(L, 1);
-//                           lua_newtable(L); // 7
-//                           lua_pushstring(L, which); // 8
-//                           lua_pushvalue(L, 7); // 9
-//                           lua_rawset(L, 6);
-//                        }
-//
-//                        lua_pushstring(L, item.attribute("name").value()); // 8
-//                        lua_pushboolean(L, remove ? 0 : 1); // 9
-//                        lua_rawset(L, 7);
-//
-//                        lua_pop(L, 1);
-//                     }
-//                     lua_pop(L, 1);
-//                  }
-//                  lua_pop(L, 1);
-//               } else {
-//                  for (S& a : apis) {
-//                     lua_pushstring(L, a.c_str()); // 5
-//                     if (LUA_TNIL != lua_rawget(L, 4)) { // 5
-//
-//                        lua_pushstring(L, profile); // 6
-//                        if (LUA_TNIL == lua_rawget(L, 5)) { // 6
-//                           lua_pop(L, 1);
-//                           lua_newtable(L); // 6
-//                           lua_pushstring(L, profile); // 7
-//                           lua_pushvalue(L, 6); // 8
-//                           lua_rawset(L, 5);
-//                        }
-//
-//                        for (pugi::xml_node item : set.children()) {
-//                           const char* which;
-//                           if (0 == strcmp(item.name(), "enum")) {
-//                              which = "enums";
-//                           } else if (0 == strcmp(item.name(), "command")) {
-//                              which = "commands";
-//                           } else if (0 == strcmp(item.name(), "type")) {
-//                              which = "types";
-//                           } else {
-//                              continue;
-//                           }
-//
-//                           lua_pushstring(L, which); // 7
-//                           if (LUA_TNIL == lua_rawget(L, 6)) { // 7
-//                              lua_pop(L, 1);
-//                              lua_newtable(L); // 7
-//                              lua_pushstring(L, which); // 8
-//                              lua_pushvalue(L, 7); // 9
-//                              lua_rawset(L, 6);
-//                           }
-//
-//                           lua_pushstring(L, item.attribute("name").value()); // 8
-//                           lua_pushboolean(L, remove ? 0 : 1); // 9
-//                           lua_rawset(L, 7);
-//
-//                           lua_pop(L, 1);
-//                        }
-//
-//                        lua_pop(L, 1);
-//                     }
-//                     lua_pop(L, 1);
-//                  }
-//               }
-//            }
-//            lua_rawset(L, 2);
-//            return 1;
-//         }
-//      }
-//   }
-//   return 0;
-//}
-//
-/////////////////////////////////////////////////////////////////////////////////
-//int gl_registry_get_command(lua_State* L) {
-//   // get information about a specific command.
-//   const char* command_name = luaL_checkstring(L, 1);
-//   lua_settop(L, 1);
-//
-//   for (pugi::xml_node commands : registry.children("commands")) {
-//      for (pugi::xml_node command : commands.children("command")) {
-//         auto proto = command.child("proto");
-//         auto name = proto.child("name");
-//
-//         if (0 == strcmp(command_name, name.child_value())) {
-//            lua_createtable(L, 0, 5); // 2
-//
-//            lua_pushliteral(L, "name"); // 3
-//            lua_pushstring(L, command_name); // 4
-//            lua_rawset(L, 2);
-//
-//            lua_pushliteral(L, "return"); // 3
-//            lua_createtable(L, 0, 3); // 4
-//            {
-//               if (auto ptype = proto.child("ptype"); !ptype.empty()) {
-//                  lua_pushliteral(L, "type"); // 5
-//                  lua_pushstring(L, ptype.child_value()); // 6
-//                  lua_rawset(L, 4);
-//               }
-//
-//               if (auto group = proto.attribute("group"); !group.empty()) {
-//                  lua_pushliteral(L, "group"); // 5
-//                  lua_pushstring(L, group.value()); // 6
-//                  lua_rawset(L, 4);
-//               }
-//
-//               S return_decl;
-//               for (auto node : proto.children()) {
-//                  if (node.type() != pugi::node_element) {
-//                     return_decl.append(node.value());
-//                  } else if (0 == strcmp(node.name(), "name")) {
-//                     break;
-//                  } else {
-//                     return_decl.append(node.child_value());
-//                  }
-//               }
-//
-//               lua_pushliteral(L, "declaration"); // 5
-//               lua_pushlstring(L, return_decl.c_str(), ( int ) return_decl.size()); // 6
-//               lua_rawset(L, 4);
-//            }
-//            lua_rawset(L, 2);
-//
-//            lua_pushliteral(L, "params"); // 3
-//            lua_newtable(L); // 4
-//
-//            I32 param_index = 1;
-//            for (auto node : command.children()) {
-//               if (node.type() == pugi::node_element) {
-//                  if (0 == strcmp(node.name(), "param")) {
-//                     lua_newtable(L); // 5
-//
-//                     lua_pushliteral(L, "name"); // 6
-//                     lua_pushstring(L, node.child("name").child_value()); // 7
-//                     lua_rawset(L, 5);
-//
-//                     if (auto ptype = node.child("ptype"); !ptype.empty()) {
-//                        lua_pushliteral(L, "type"); // 6
-//                        lua_pushstring(L, ptype.child_value()); // 7
-//                        lua_rawset(L, 5);
-//                     }
-//
-//                     if (auto group = node.attribute("group"); !group.empty()) {
-//                        lua_pushliteral(L, "group"); // 6
-//                        lua_pushstring(L, group.value()); // 7
-//                        lua_rawset(L, 5);
-//                     }
-//
-//                     if (auto len = node.attribute("len"); !len.empty()) {
-//                        const char* val = len.value();
-//
-//                        lua_pushliteral(L, "raw_length"); // 6
-//                        lua_pushstring(L, val); // 7
-//                        lua_rawset(L, 5);
-//                        
-//                        U32 length = ( U32 ) strtoul(val, nullptr, 10);
-//                        if (length > 0) {
-//                           lua_pushliteral(L, "length"); // 6
-//                           lua_pushinteger(L, length); // 7
-//                           lua_rawset(L, 5);
-//                        }
-//                     }
-//
-//                     S decl;
-//                     for (auto param_node : node.children()) {
-//                        if (param_node.type() != pugi::node_element) {
-//                           decl.append(param_node.value());
-//                        } else if (0 == strcmp(param_node.name(), "name")) {
-//                           break;
-//                        } else {
-//                           decl.append(param_node.child_value());
-//                        }
-//                     }
-//
-//                     lua_pushliteral(L, "declaration"); // 6
-//                     lua_pushlstring(L, decl.c_str(), (int)decl.size()); // 7
-//                     lua_rawset(L, 5);
-//
-//                     lua_rawseti(L, 4, param_index);
-//                     ++param_index;
-//                  } else if (0 == strcmp(node.name(), "alias")) {
-//                     lua_pushliteral(L, "alias"); // 5
-//                     lua_pushstring(L, node.attribute("name").value()); // 6
-//                     lua_rawset(L, 2);
-//                  } else if (0 == strcmp(node.name(), "vecequiv")) {
-//                     lua_pushliteral(L, "vector_equivalent"); // 5
-//                     lua_pushstring(L, node.attribute("name").value()); // 6
-//                     lua_rawset(L, 2);
-//                  }
-//               }
-//            }
-//
-//            lua_rawset(L, 2);
-//            return 1;
-//         }
-//      }
-//   }
-//
-//   return 0;
-//}
-//
-/////////////////////////////////////////////////////////////////////////////////
-//int gl_registry_get_enum(lua_State* L) {
-//   // get information about a specific enum.
-//   const char* enum_name = luaL_checkstring(L, 1);
-//
-//   S query_api;
-//   if (lua_gettop(L) > 1) {
-//      query_api = luaL_checkstring(L, 2);
-//   }
-//
-//   lua_settop(L, 1);
-//
-//   for (pugi::xml_node enums : registry.children("enums")) {
-//      for (pugi::xml_node enum_elem : enums.children("enum")) {
-//         if (0 == strcmp(enum_name, enum_elem.attribute("name").value())) {
-//            if (pugi::xml_attribute api = enum_elem.attribute("api"); !query_api.empty() && !api.empty()) {
-//               if (0 != strcmp(api.value(), query_api.c_str())) {
-//                  continue;
-//               }
-//            }
-//
-//            lua_createtable(L, 0, 9); // 2
-//
-//            lua_pushliteral(L, "name"); // 3
-//            lua_pushstring(L, enum_name); // 4
-//            lua_rawset(L, 2);
-//
-//            lua_pushliteral(L, "raw_value"); // 3
-//            lua_pushstring(L, enum_elem.attribute("value").value()); // 4
-//            lua_rawset(L, 2);
-//
-//            lua_pushliteral(L, "value"); // 3
-//            lua_pushinteger(L, enum_elem.attribute("value").as_uint()); // 4
-//            lua_rawset(L, 2);
-//
-//            if (auto attr = enum_elem.attribute("type"); !attr.empty()) {
-//               lua_pushliteral(L, "suffix"); // 3
-//               lua_pushstring(L, attr.value()); // 4
-//               lua_rawset(L, 2);
-//            }
-//
-//            if (auto attr = enum_elem.attribute("alias"); !attr.empty()) {
-//               lua_pushliteral(L, "alias"); // 3
-//               lua_pushstring(L, attr.value()); // 4
-//               lua_rawset(L, 2);
-//            }
-//
-//            if (auto attr = enum_elem.attribute("api"); !attr.empty()) {
-//               lua_pushliteral(L, "api"); // 3
-//               lua_pushstring(L, attr.value()); // 4
-//               lua_rawset(L, 2);
-//            }
-//
-//            lua_pushliteral(L, "namespace"); // 3
-//            lua_pushstring(L, enums.attribute("namespace").value()); // 4
-//            lua_rawset(L, 2);
-//
-//            if (0 == strcmp("bitmask", enums.attribute("type").value())) {
-//               lua_pushliteral(L, "bitmask"); // 3
-//               lua_pushboolean(L, 1); // 4
-//               lua_rawset(L, 2);
-//            }
-//            
-//            if (auto attr = enums.attribute("vendor"); !attr.empty()) {
-//               lua_pushliteral(L, "vendor"); // 3
-//               lua_pushstring(L, attr.value()); // 4
-//               lua_rawset(L, 2);
-//            }
-//
-//            return 1;
-//         }
-//      }
-//   }
-//
-//   return 0;
-//}
-//
-/////////////////////////////////////////////////////////////////////////////////
-//int gl_registry_get_type(lua_State* L) {
-//   // get information about a specific type.
-//   const char* type_name = luaL_checkstring(L, 1);
-//
-//   S query_api;
-//   if (lua_gettop(L) > 1) {
-//      query_api = luaL_checkstring(L, 2);
-//   }
-//
-//   S apientry;
-//   if (lua_gettop(L) > 2) {
-//      apientry = luaL_checkstring(L, 3);
-//   } else {
-//      apientry = "APIENTRY";
-//   }
-//
-//   lua_settop(L, 1);
-//
-//   for (pugi::xml_node types : registry.children("types")) {
-//      for (pugi::xml_node type : types.children("type")) {
-//         if (pugi::xml_attribute api = type.attribute("api"); !query_api.empty() && !api.empty()) {
-//            if (0 != strcmp(api.value(), query_api.c_str())) {
-//               continue;
-//            }
-//         }
-//
-//         const char* name;
-//         if (auto name_element = type.child("name"); !name_element.empty()) {
-//            name = name_element.child_value();
-//         } else if (auto name_attrib = type.attribute("name"); !name_attrib.empty()) {
-//            name = name_attrib.value();
-//         } else {
-//            continue;
-//         }
-//         if (0 == strcmp(name, type_name)) {
-//            lua_createtable(L, 0, 4); // 2
-//
-//            lua_pushliteral(L, "name"); // 3
-//            lua_pushstring(L, name); // 4
-//            lua_rawset(L, 2);
-//
-//            if (pugi::xml_attribute api = type.attribute("api"); !api.empty()) {
-//               lua_pushliteral(L, "api"); // 3
-//               lua_pushstring(L, api.value()); // 4
-//               lua_rawset(L, 2);
-//            }
-//
-//            if (pugi::xml_attribute requires = type.attribute("requires"); !requires.empty()) {
-//               lua_pushliteral(L, "requires"); // 3
-//               lua_pushstring(L, requires.value()); // 4
-//               lua_rawset(L, 2);
-//            }
-//            
-//            S contents;
-//            for (pugi::xml_node child : type.children()) {
-//               if (child.type() == pugi::node_element) {
-//                  if (0 == strcmp(child.name(), "apientry")) {
-//                     contents += apientry;
-//                  } else {
-//                     contents += child.child_value();
-//                  }
-//               } else {
-//                  contents += child.value();
-//               }
-//            }
-//
-//            lua_pushliteral(L, "declaration");
-//            lua_pushlstring(L, contents.c_str(), contents.size());
-//            lua_rawset(L, 2);
-//
-//            return 1;
-//         }
-//      }
-//   }
-//
-//   return 0;
-//}
-//
-/////////////////////////////////////////////////////////////////////////////////
-//int gl_registry_get_group(lua_State* L) {
-//   // get information about a specific enum group.
-//   const char* group_name = luaL_checkstring(L, 1);
-//   lua_settop(L, 1);
-//
-//   for (pugi::xml_node groups : registry.children("groups")) {
-//      for (pugi::xml_node group : groups.children("group")) {
-//         if (0 == strcmp(group_name, group.attribute("name").value())) {
-//            lua_createtable(L, 0, 2); // 2
-//
-//            lua_pushliteral(L, "name"); // 3
-//            lua_pushstring(L, group_name); // 4
-//            lua_rawset(L, 2);
-//
-//            lua_pushliteral(L, "enums"); // 3
-//            lua_newtable(L); // 4
-//
-//            for (pugi::xml_node enum_elem : group.children("enum")) {
-//               lua_pushstring(L, enum_elem.attribute("name").value());
-//               lua_pushboolean(L, 1);
-//               lua_rawset(L, 4);
-//            }
-//
-//            lua_rawset(L, 2);
-//
-//            return 1;
-//         }
-//      }
-//   }
-//
-//   return 0;
-//}
+// gl_registry.query('SELECT ...', { paramA, paramB, ... }, function (columnA, columnB, ... ) ... end) -> (nil)
+// gl_registry.query('SELECT ...', paramA, paramB) -> singleColumnSingleRowResult
+// gl_registry.query('SELECT ...', paramA, paramB) -> singleRowColumnA, singleRowColumnB, ...
+// gl_registry.query('SELECT ...', paramA, paramB) -> { { rowAcolumnA, rowAcolumnB, ... }, { rowBcolumnA, ... }, ... }
+int gl_registry_query(lua_State* L) {
+   const char* query = luaL_checkstring(L, 1);
+   auto stmt = cache->obtain(query);
+
+   if (lua_gettop(L) >= 2 && lua_type(L, 2) == LUA_TTABLE) {
+      for (int i = 1, n = (int)lua_rawlen(L, 2); i <= n; ++i) {
+         switch (lua_rawgeti(L, 2, i)) {
+            case LUA_TBOOLEAN:
+               stmt.bind(( int ) i, 0 != lua_toboolean(L, -1));
+               break;
+            case LUA_TSTRING:
+               stmt.bind(( int ) i, lua_tostring(L, -1));
+               break;
+            case LUA_TNUMBER:
+               if (0 != lua_isinteger(L, -1)) {
+                  stmt.bind(( int ) i, lua_tointeger(L, -1));
+               } else {
+                  stmt.bind(( int ) i, lua_tonumber(L, -1));
+               }
+               break;
+            default:
+               stmt.bind(( int ) i);
+               break;
+         }
+         lua_pop(L, 1);
+      }
+
+      if (lua_gettop(L) >= 3 && lua_type(L, 3) == LUA_TFUNCTION) {
+         int cols = stmt.columns();
+         lua_checkstack(L, cols);
+
+         while (stmt.step()) {
+
+            lua_pushvalue(L, 3);
+
+            for (int i = 0; i < cols; ++i) {
+               switch (stmt.get_type(i)) {
+                  case sqlite::ResultType::blob:
+                  case sqlite::ResultType::text:
+                  {
+                     std::size_t len;
+                     const char* data = static_cast<const char*>(stmt.get_blob(i, len));
+                     lua_pushlstring(L, data, len);
+                     break;
+                  }
+                  case sqlite::ResultType::integer:
+                     lua_pushinteger(L, stmt.get_i64(i));
+                     break;
+                  case sqlite::ResultType::real:
+                     lua_pushnumber(L, stmt.get_f64(i));
+                     break;
+                  default:
+                     lua_pushnil(L);
+                     break;
+               }
+            }
+
+            lua_call(L, cols, 1);
+
+            if (lua_type(L, -1) == LUA_TBOOLEAN && 0 == lua_toboolean(L, -1)) {
+               lua_pop(L, 1);
+               break;
+            }
+
+            lua_pop(L, 1);
+         }
+
+         return 0;
+      }
+   } else {
+      int i = 1;
+      for (int slot = 2, n = lua_gettop(L); slot <= n; ++slot) {
+         switch (lua_type(L, slot)) {
+            case LUA_TBOOLEAN:
+               stmt.bind(( int ) i, 0 != lua_toboolean(L, slot));
+               break;
+            case LUA_TSTRING:
+               stmt.bind(( int ) i, lua_tostring(L, slot));
+               break;
+            case LUA_TNUMBER:
+               if (0 != lua_isinteger(L, -1)) {
+                  stmt.bind(( int ) i, lua_tointeger(L, slot));
+               } else {
+                  stmt.bind(( int ) i, lua_tonumber(L, slot));
+               }
+               break;
+            default:
+               stmt.bind(( int ) i);
+               break;
+         }
+         ++i;
+      }
+   }
+
+   lua_settop(L, 0);
+   lua_pushnil(L); // 1; placeholder for result table if we have more than one row
+
+   int cols = stmt.columns();
+   int row = 0;
+   while (stmt.step()) {
+      ++row;
+
+      if (row == 2) {
+         // second row, create result table
+         lua_createtable(L, 3, 0);
+         lua_replace(L, 1); // 1 was nil
+
+         lua_createtable(L, cols, 0);
+         lua_replace(L, 2); // 2 was nil
+
+         for (int i = 1; i <= cols; ++i) {
+            lua_pushvalue(L, 2 + i);
+            lua_rawseti(L, 2, i);
+         }
+         lua_settop(L, 2); // pop values from first row
+         lua_rawseti(L, 1, 1); // insert first row
+      }
+
+      if (row > 1) {
+         lua_createtable(L, cols, 0); // 2
+      } else {
+         lua_pushnil(L); // 2; placeholder for row table if we have a second row
+         lua_checkstack(L, cols + 2);
+      }
+
+      for (int i = 0; i < cols; ++i) {
+         switch (stmt.get_type(i)) {
+            case sqlite::ResultType::blob:
+            case sqlite::ResultType::text:
+            {
+               std::size_t len;
+               const char* data = static_cast<const char*>(stmt.get_blob(i, len));
+               lua_pushlstring(L, data, len);
+               break;
+            }
+            case sqlite::ResultType::integer:
+               lua_pushinteger(L, stmt.get_i64(i));
+               break;
+            case sqlite::ResultType::real:
+               lua_pushnumber(L, stmt.get_f64(i));
+               break;
+            default:
+               lua_pushnil(L);
+               break;
+         }
+
+         if (row > 1) {
+            lua_rawseti(L, 2, i + 1); // put value into row table
+         }
+      }
+
+      if (row > 1) {
+         lua_rawseti(L, 1, row); // insert row into result table
+      }
+   }
+
+   return row > 1 ? 1 : cols;
+}
 
 } // be::bglgen::()
 
@@ -824,7 +321,7 @@ sqlite::StaticStmtCache* cache = nullptr;
 BglGenApp::BglGenApp(int argc, char** argv) {
    default_log().verbosity_mask(v::info_or_worse);
    default_log().clear_sinks();
-   default_log().sink(ConsoleLogSink(std::clog, std::cerr));
+   default_log().sink(ConsoleLogSink(std::cerr, std::cerr));
    try {
       using namespace cli;
       using namespace color;
@@ -909,9 +406,16 @@ BglGenApp::BglGenApp(int argc, char** argv) {
             return true;
          }))
 
+      (param({ "p" }, { "pre-execute" }, "LUA", [&](const S& lua) {
+            lua_chunks_.push_back(lua);
+         }).desc("Execues the specified lua command after finding GL symbols in the input files.")
+            .extra(Cell() << "The default " << fg_cyan << "process()" << reset << " function will be called "
+                             "afterwards unless it is overridden by an " << fg_yellow << "--execute"))
+
       (param({ "e" }, { "execute" }, "LUA", [&](const S& lua) {
             lua_chunks_.push_back(lua);
-         }).desc("Executes the specified lua command after finding GL symbols in the input files.")
+            do_process_ = false;
+         }).desc("Replaces the default task run after finding GL symbols in the input files.")
             .extra(Cell() << "If no " << fg_yellow << "--execute" << reset << " options are specified, "
                              "then the default " << fg_cyan << "process()" << reset << " function will be called."))
 
@@ -947,9 +451,11 @@ BglGenApp::BglGenApp(int argc, char** argv) {
 
       if (show_help) {
          proc.describe(std::cout, verbose, help_query);
+         status_ = 2;
       } else if (show_version) {
          proc.describe(std::cout, verbose, ids::cli_describe_section_prologue);
          proc.describe(std::cout, verbose, ids::cli_describe_section_license);
+         status_ = 2;
       }
 
    } catch (const cli::OptionError& e) {
@@ -1021,8 +527,6 @@ int BglGenApp::operator()() {
    }
 
    sqlite::StaticStmtCache db_cache(db);
-
-   registry = &db;
    cache = &db_cache;
 
    std::unordered_multimap<S, SymbolUsage> symbols;
@@ -1071,6 +575,8 @@ int BglGenApp::operator()() {
    be_short_verbose("") << "Found " << symbols.size() << " references to " << unique_functions.size() << " functions and " << unique_constants.size() << " constants/types." | default_log();
 
    try {
+      sqlite::Transaction tx(db);
+
       belua::Context context({
          belua::id_module,
          belua::logging_module,
@@ -1085,21 +591,12 @@ int BglGenApp::operator()() {
       });
 
       luaL_Reg fn[] {
-         //{ "list_features", gl_registry_list_features },
-         //{ "list_extensions", gl_registry_list_extensions },
-         //{ "get_feature", gl_registry_get_feature },
-         //{ "get_extension", gl_registry_get_extension },
-         //{ "get_command", gl_registry_get_command },
-         //{ "get_enum", gl_registry_get_enum },
-         //{ "get_type", gl_registry_get_type },
-         //{ "get_group", gl_registry_get_group },
+         { "query", gl_registry_query },
          { nullptr, nullptr }
       };
 
-      lua_rawgeti(context.L(), LUA_REGISTRYINDEX, LUA_RIDX_GLOBALS);
-      lua_pushliteral(context.L(), "gl_registry");
       luaL_newlib(context.L(), fn);
-      lua_rawset(context.L(), -3);
+      lua_setglobal(context.L(), "gl_registry");
 
       add_gl_data(context.L(), "found_functions", true, unique_functions, symbols);
       unique_functions.clear(); // don't need this anymore; clear up some memory
@@ -1109,13 +606,21 @@ int BglGenApp::operator()() {
 
       context.execute(inflate_bglgen_core(), "@BGLgen core");
 
-      if (lua_chunks_.empty()) {
+      {
+         S bgl_default_template = inflate_bgl_default_template();
+         lua_getglobal(context.L(), "register_template_string");
+         lua_pushlstring(context.L(), bgl_default_template.c_str(), ( int ) bgl_default_template.size());
+         lua_pushstring(context.L(), "bgl_default");
+         belua::ecall(context.L(), 2, 0);
+      }
+
+      for (S& lua : lua_chunks_) {
+         context.execute(lua, "@--execute Chunk");
+      }
+
+      if (do_process_) {
          lua_getglobal(context.L(), "process");
          belua::ecall(context.L(), 0, 0);
-      } else {
-         for (S& lua : lua_chunks_) {
-            context.execute(lua, "@--execute Chunk");
-         }
       }
 
       S result;
@@ -1131,7 +636,20 @@ int BglGenApp::operator()() {
       }
 
       std::cout << result;
+      std::cout.flush();
 
+   } catch (const sqlite::SqlTrace& e) {
+      status_ = 4;
+      log_exception(e);
+   } catch (const sqlite::SqlError& e) {
+      status_ = 4;
+      log_exception(e);
+   } catch (const belua::LuaTrace& e) {
+      status_ = 4;
+      log_exception(e);
+   } catch (const belua::LuaError& e) {
+      status_ = 4;
+      log_exception(e);
    } catch (const FatalTrace& e) {
       status_ = 4;
       log_exception(e);

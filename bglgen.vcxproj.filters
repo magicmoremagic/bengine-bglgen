@@ -49,12 +49,18 @@
     <ClInclude Include="include\sql_ids.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="include\bglgen_blt.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="meta\lexer.rl">
       <Filter>Meta-Source Files</Filter>
     </None>
     <None Include="meta\bglgen.lua">
+      <Filter>Meta-Source Files</Filter>
+    </None>
+    <None Include="meta\bgl_default.blt">
       <Filter>Meta-Source Files</Filter>
     </None>
   </ItemGroup>

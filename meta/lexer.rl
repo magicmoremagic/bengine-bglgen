@@ -22,19 +22,22 @@ namespace {
    multi_line_comment =       '/*' ( ^'*' | '*'+ [^/*] )* '*'+ '/' ;
    unclosed_comment =         '/*' ( ^'*' | '*'+ [^/*] )* '*'*;
 
-   initial_identifier_char =  alpha | '_' | ^ascii ;
+   initial_identifier_char =  alpha | '_' ;
    identifier_char =          initial_identifier_char | digit ;
+   bgl_identifier_char =      identifier_char | '.' | '-' ;
 
    gl_identifier =            'GL_' identifier_char* | 'gl' [A-Z] identifier_char* ;
    identifier =               initial_identifier_char identifier_char* ;
    non_gl_identifier =        identifier - gl_identifier ;
+   bgl_identifier =           bgl_identifier_char+ ;
 
-   bgl_prequel =              '#' optional_whitespace 'pragma' whitespace 'comment' optional_whitespace '(' optional_whitespace 'bgl' optional_whitespace ',' optional_whitespace ;
+   bgl_prequel =              '//' optional_whitespace '#bgl' whitespace ;
 
-   bgl_checked =              bgl_prequel 'checked' optional_whitespace ',' optional_whitespace identifier optional_whitespace ')' ;
-   bgl_unchecked =            bgl_prequel 'unchecked' optional_whitespace ')' ;
-   bgl_weight =               bgl_prequel 'weight' optional_whitespace ',' optional_whitespace digit+ optional_whitespace ')' ;
-   bgl_reset_weight =         bgl_prequel 'weight' optional_whitespace ')' ;
+   bgl_stop =                 bgl_prequel 'stop' ;
+   bgl_checked =              bgl_prequel 'checked' optional_whitespace '(' optional_whitespace bgl_identifier optional_whitespace ')' ;
+   bgl_unchecked =            bgl_prequel 'unchecked' ;
+   bgl_weight =               bgl_prequel 'weight' optional_whitespace '(' optional_whitespace digit+ optional_whitespace ')' ;
+   bgl_reset_weight =         bgl_prequel 'weight' ;
 
    escape_seq =               '\\' ( [abfnrtv?\\'"] | odigit{1,3} | 'x' xdigit+ | 'u' xdigit{4} | 'U' xdigit{8} ) ;
    s_char =                   alnum | [ \t\v\f_{}\[\]#()<>%:;.?*+\-/^&|~!=,\'] | ^ascii | escape_seq ;
@@ -43,10 +46,12 @@ namespace {
    main := |*
       non_gl_identifier => {};
       gl_identifier => { symbol_(); };
+	  bgl_stop => { ignore_symbols_ = true; };
       bgl_checked => { set_check_(); };
       bgl_unchecked => { check_ = S(); };
       bgl_weight => { set_weight_(); };
       bgl_reset_weight => { weight_ = 100; };
+	  bgl_prequel => { bgl_malformed_(); };
       newline => { ls_ = te_; ++line_; };
       string_literal => {};
       single_line_comment => {};
@@ -62,12 +67,14 @@ namespace {
 Lexer::Lexer(Path path, gsl::string_span<> input, std::unordered_multimap<S, SymbolUsage>& output)
    : path_(std::move(path)),
      input_(input),
-	 output_(output) { }
+	 output_(output),
+	 ignore_symbols_(false) { }
 
 ///////////////////////////////////////////////////////////////////////////////
 void Lexer::operator()() {
    check_ = S();
    weight_ = 100;
+   ignore_symbols_ = false;
    ps_ = p_ = input_.data();
    pe_ = p_ + input_.length();
    char* eof = pe_;
@@ -85,6 +92,7 @@ void Lexer::operator()() {
 
 ///////////////////////////////////////////////////////////////////////////////
 void Lexer::symbol_() {
+   if (ignore_symbols_) return;
    std::ptrdiff_t offset = ts_ - ps_;
    std::ptrdiff_t length = te_ - ts_;
    gsl::string_span<> symbol = input_.subspan(offset, length);
@@ -103,7 +111,7 @@ void Lexer::set_check_() {
       if (c >= 'a' && c <= 'z' ||
           c >= 'A' && c <= 'Z' ||
           c >= '0' && c <= '9' ||
-          c == '_') {
+          c == '_' || c == '.' || c == '-') {
          --begin;
       } else if (begin == end) {
          --begin;
@@ -111,7 +119,6 @@ void Lexer::set_check_() {
       } else {
          break;
       }
-      --it;
    }
 
    check_ = S(begin, end);
@@ -171,6 +178,18 @@ void Lexer::comment_() {
    if (ls > 0) {
       ls_ = ts_ + ls;
    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+void Lexer::bgl_malformed_() {
+   std::ptrdiff_t offset = ts_ - ps_;
+   std::ptrdiff_t length = te_ - ts_;
+   gsl::string_span<> symbol = input_.subspan(offset, length);
+   be_warn("") << "Malformed //#bgl declaration!"
+	  & attr("Declaration") << S(symbol.begin(), symbol.end())
+	  & attr("Path") << path_.generic_string()
+	  & attr("Line") << line_
+	  | default_log();
 }
 
 } // be::bglgen

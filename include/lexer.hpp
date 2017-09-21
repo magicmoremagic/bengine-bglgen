@@ -27,6 +27,7 @@ private:
    void set_check_();
    void set_weight_();
    void comment_();
+   void bgl_malformed_();
    
    Path path_;
    gsl::string_span<> input_;
@@ -40,6 +41,7 @@ private:
    char* ls_;
    U32 line_;
    U16 weight_;
+   bool ignore_symbols_;
    S check_;
 };
 

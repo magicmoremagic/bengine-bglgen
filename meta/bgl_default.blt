@@ -1,0 +1,423 @@
+//#bgl stop
+/*
+This file includes excerpts from the combined OpenGL XML registry:
+   `indent() indent_newlines(comment) unindent()`
+*/
+
+#if defined(__gl_h_)
+#error Do not include gl.h before bgl.hpp
+#elif defined(__GL_H__)
+#error Do not include gl.h before bgl.hpp
+#elif defined(_GL_H)
+#error Do not include gl.h before bgl.hpp
+#elif defined(__X_GL_H)
+#error Do not include gl.h before bgl.hpp
+#elif defined(__gl2_h_)
+#error Do not include gl2.h before bgl.hpp
+#elif defined(__gltypes_h_)
+#error Do not include gltypes.h before bgl.hpp
+#elif defined(__glext_h_) || defined(__GLEXT_H_)
+#error Do not include glext.h before bgl.hpp
+#endif
+#define __gl_h_
+#define __gl2_h_
+#define __GL_H__
+#define _GL_H
+#define __gltypes_h_
+#define __X_GL_H
+#define __glext_h_
+#define __GLEXT_H_
+
+#ifndef GLAPIENTRY
+#ifndef APIENTRY
+#ifdef _WIN32
+#define APIENTRY __stdcall
+#else
+#define APIENTRY
+#endif
+#define BE_GFX_BGL_APIENTRY_DEFINED
+#endif
+#define GLAPIENTRY APIENTRY
+#endif
+
+#include <be/core/be.hpp>
+
+namespace be::gfx::gl {
+
+////////// TYPES /////////////////////////////////////////////////////////////
+`
+with each types using # {
+   if not hide {
+      nl full_decl
+   }
+}
+`
+
+////////// BGL ///////////////////////////////////////////////////////////////
+
+struct BglContext;
+
+class BglContextHandle final {
+   friend struct BglContext;
+   struct deleter {
+      void operator()(BglContext* ptr);
+   };
+public:
+   BglContextHandle() = default;
+   const BglContext* get() const noexcept;
+   BglContext* get() noexcept;
+private:
+   BglContextHandle(BglContext* ptr);
+   std::unique_ptr<BglContext, deleter> ptr_;
+};
+
+BglContextHandle init_context();
+void switch_context(const BglContextHandle& context) noexcept;
+const char* enum_name (GLenum e) noexcept;
+
+////////// FEATURES //////////////////////////////////////////////////////////
+`
+with each features using # {
+   nl `#define `name` (::be::gfx::gl::`func_name`())`
+}
+nl
+with each features using # {
+   nl `bool `func_name`() noexcept;`
+}
+nl
+`
+////////// EXTENSIONS ////////////////////////////////////////////////////////
+`
+with each extensions using # {
+   nl `#define `name` (::be::gfx::gl::`func_name`())`
+}
+nl
+with each extensions using # {
+   nl `bool `func_name`() noexcept;`
+}
+nl
+if not skip_groups {
+   `
+////////// ENUM GROUPS ///////////////////////////////////////////////////////
+`  with each groups using # {
+      maxlen = max_name_length
+      if not empty {
+         nl
+         `namespace `name` {` nl
+         `enum `name` {`
+         with each enums using # {
+            nl '   ' rpad(transformed_name, maxlen) ' = ' raw_value suffix ',' extra
+         }
+         nl '};' nl '} // ' name nl
+      }
+   }
+   nl
+}
+`
+////////// ENUMS /////////////////////////////////////////////////////////////
+
+enum AllEnums {`
+maxenumlen = max_enum_name_length
+with each enums using # {
+nl '   ' rpad(name, maxenumlen) ' = ' raw_value suffix ',' extra
+}`
+};
+
+////////// COMMANDS //////////////////////////////////////////////////////////
+` with each commands using # {
+   nl return_decl name '('
+   with each params using # {
+      if (__k__ > 1) ', '
+      decl ' ' name
+   }
+   ') noexcept;'
+}`
+
+} // be::gfx::gl
+
+#if defined(BE_GFX_BGL_APIENTRY_DEFINED) && !defined(BE_GFX_BGL_IMPLEMENTATION)
+#undef BE_GFX_BGL_APIENTRY_DEFINED
+#undef APIENTRY
+#endif
+
+//////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+
+#ifdef BE_GFX_BGL_IMPLEMENTATION
+
+#include <glfw/glfw3.h>
+
+namespace be::gfx::gl {
+
+////////// BGL ///////////////////////////////////////////////////////////////
+` with each commands using # {
+   nl `using `fp_name` = `return_decl`(GLAPIENTRY*)(`
+   with each params using # {
+      if (__k__ > 1) { ', ' }
+      decl
+   }
+   ');'
+}`
+
+struct BglContext final {`
+with each features using # {
+   nl `   bool b`ctx_name` = false;`
+}
+nl
+with each extensions using # {
+   nl `   bool b`ctx_name` = false;`
+}
+nl
+with each commands using # {
+   nl '   ' fp_name ' b' name ' = nullptr;'
+}`
+
+   static BglContextHandle make_handle() {
+	  return BglContextHandle(new BglContext());
+   }
+
+   static BglContextHandle make_handle(const BglContext& ctx) {
+	  return BglContextHandle(new BglContext(ctx));
+   }
+};
+
+namespace {
+
+#ifdef BE_GFX_BGL_MULTITHREADED
+#ifdef BE_GFX_BGL_FAST_CONTEXT_SWITCH
+thread_local BglContext const* bglctx = nullptr;
+#define BE_GFX_BGL_CONTEXT (*bglctx)
+#else
+thread_local BglContext bglctx;
+#define BE_GFX_BGL_CONTEXT bglctx
+#endif
+#else
+#ifdef BE_GFX_BGL_FAST_CONTEXT_SWITCH
+BglContext const* bglctx = nullptr;
+#define BE_GFX_BGL_CONTEXT (*bglctx)
+#else
+BglContext bglctx;
+#define BE_GFX_BGL_CONTEXT bglctx
+#endif
+#endif
+
+constexpr U64 fnv_basis = 14695981039346656037ull;
+constexpr U64 fnv_prime = 1099511628211ull;
+
+//////////////////////////////////////////////////////////////////////////////
+U64 hash_name(const char* ptr) {
+   U64 v = fnv_basis;
+   for (const char* it = ptr; *it; ++it) {
+      v = (v ^ static_cast<U8>(*it)) * fnv_prime;
+   }
+   return v;
+}
+
+//////////////////////////////////////////////////////////////////////////////
+U64 hash_name(const char* begin, const char* end) {
+   U64 v = fnv_basis;
+   for (const char* it = begin; it != end; ++it) {
+      v = (v ^ static_cast<U8>(*it)) * fnv_prime;
+   }
+   return v;
+}
+
+//////////////////////////////////////////////////////////////////////////////
+void check_extension(U64 hash) {
+   BglContext& ctx = BE_GFX_BGL_CONTEXT;
+   switch (hash)  {`
+with each extensions using # {
+   nl `      case U64(`hash`ll): ctx.b`ctx_name` = `
+   with each commands using # {
+      if (__k__ % 5 == 0) {
+         nl '         '
+      }
+      if __k__ > 1 { ' && ' }
+      'ctx.b' name
+   }
+   if #commands == 0 {
+      'true'
+   }
+   `; break;`
+}`
+   }
+}
+
+} // ()
+
+//////////////////////////////////////////////////////////////////////////////
+void BglContextHandle::deleter::operator()(BglContext* ptr) {
+   // Extra layer of indirection means BglContext can remain opaque outside of
+   // the implementation file.
+   delete ptr;
+}
+
+//////////////////////////////////////////////////////////////////////////////
+const BglContext* BglContextHandle::get() const noexcept {
+	return ptr_.get();
+}
+
+//////////////////////////////////////////////////////////////////////////////
+BglContext* BglContextHandle::get() noexcept {
+	return ptr_.get();
+}
+
+//////////////////////////////////////////////////////////////////////////////
+BglContextHandle::BglContextHandle(BglContext* ptr)
+   : ptr_(ptr, deleter()) { }
+
+//////////////////////////////////////////////////////////////////////////////
+BglContextHandle init_context() {
+#ifdef BE_GFX_BGL_FAST_CONTEXT_SWITCH
+   BglContextHandle BglContext::make_handle();
+   bglctx = context.get();
+   BglContext& ctx = context.get();
+#else
+   BglContextHandle context;
+   bglctx = BglContext();
+   BglContext& ctx = bglctx;
+#endif
+
+   
+
+   using GLGETSTRING_PROC = const unsigned char* (GLAPIENTRY*)(GLenum);
+   using GLGETSTRINGI_PROC = const unsigned char* (GLAPIENTRY*)(GLenum, unsigned int);
+   using GLGETINTEGERV_PROC = void (GLAPIENTRY*)(GLenum, int *);
+
+   auto getString = GLGETSTRING_PROC(glfwGetProcAddress("glGetString"));
+   if (!getString) {
+      throw std::system_error(std::make_error_code(std::errc::not_supported), "OpenGL context and/or driver not available!");
+   }
+
+   const unsigned char* version_string = getString(GL_VERSION);
+
+   unsigned int major = 0, minor = 0;
+   {
+      unsigned int* vptr = &major;
+      for (const unsigned char* it = version_string; *it; ++it) {
+         const char c = (char)*it;
+         if (c >= '0' && c <= '9') {
+            *vptr = *vptr * 10 + c - '0';
+         } else if (c == '.' && vptr == &major) {
+            vptr = &minor;
+         } else {
+            break;
+         }
+      }
+   }
+
+   if (major == 0) {
+      throw std::system_error(std::make_error_code(std::errc::not_supported), "OpenGL version could not be parsed!");
+   }
+   `
+with each commands using # {
+   nl `   ctx.b`name` = `fp_name`(glfwGetProcAddress("`name`"));`
+}
+nl
+with each features using # {
+   nl `   ctx.b`ctx_name` = `
+   if prev_feature {
+      'ctx.b' prev_feature.ctx_name ' && '
+   }
+   `(major > `version_major` || major == `version_major` && minor >= `version_minor`)`
+   with each commands using # {
+      if (__k__ % 5 == 1) {
+         nl '      '
+      }
+      ' && ctx.b' name
+   }
+   ';'
+}`
+
+   if (major >= 3) {
+      auto getIntegerv = GLGETINTEGERV_PROC(glfwGetProcAddress("glGetIntegerv"));
+      auto getStringi = GLGETSTRINGI_PROC(glfwGetProcAddress("glGetStringi"));
+
+      if (getIntegerv && getStringi) {
+         int num_extensions = 0;   
+         getIntegerv(GL_NUM_EXTENSIONS, &num_extensions);
+      
+         for (int i = 0; i < num_extensions; ++i) {
+            const char* extension = (const char*)getStringi(GL_EXTENSIONS, i);
+            if (extension) {
+               check_extension(hash_name(extension));
+            }
+         }
+      }
+   } else {
+      const char* extensions = (const char*)getString(GL_EXTENSIONS);
+      if (extensions) {
+         for (const char* begin = extensions, *it = extensions; ; ++it) {
+            char c = *it;
+            if (c == ' ') {
+               check_extension(hash_name(begin, it));
+               begin = it + 1;
+            } else if (c == '\0') {
+               check_extension(hash_name(begin, it));
+               break;
+            }
+         }
+      }
+   }
+
+#ifndef BE_GFX_BGL_FAST_CONTEXT_SWITCH
+   context = BglContext::make_handle(ctx);
+#endif
+   return context;
+}
+
+//////////////////////////////////////////////////////////////////////////////
+void switch_context(const BglContextHandle& context) noexcept {
+#ifdef BE_GFX_BGL_FAST_CONTEXT_SWITCH
+   bglctx = context.get();
+#else
+   bglctx = *context.get();
+#endif
+}
+
+//////////////////////////////////////////////////////////////////////////////
+const char* enum_name (GLenum e) noexcept {
+   // TODO
+   return nullptr;
+}
+
+////////// FEATURES (IMPL) ///////////////////////////////////////////////////
+`
+with each features using # {
+   nl 'bool ' func_name '() noexcept {' nl
+   '   return BE_GFX_BGL_CONTEXT.b' ctx_name ';' nl
+   '}'
+}
+nl
+`
+////////// EXTENSIONS (IMPL) /////////////////////////////////////////////////
+`
+with each extensions using # {
+   nl 'bool ' func_name '() noexcept {' nl
+   '   return BE_GFX_BGL_CONTEXT.b' ctx_name ';' nl
+   '}'
+}
+nl
+`
+////////// COMMANDS (IMPL) ///////////////////////////////////////////////////
+`
+with each commands using # {
+   nl return_decl name '('
+   with each params using # {
+      if (__k__ > 1) ', '
+      decl ' ' name
+   }
+   ') noexcept {' nl
+   `   return BE_GFX_BGL_CONTEXT.b`name`(`
+   with each params using # {
+      if (__k__ > 1) ', '
+      name
+   }
+   ');' nl
+   '}'
+}
+nl
+`
+} // be::gfx::gl
+#endif

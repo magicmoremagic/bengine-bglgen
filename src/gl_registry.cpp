@@ -1,14 +1,12 @@
 #include "gl_registry.hpp"
 #include "sql_ids.hpp"
-#include <be/util/get_file_contents.hpp>
 #include <be/core/id.hpp>
 #include <be/core/logging.hpp>
-#include <be/core/log_attrib_ids.hpp>
-#include <be/sqlite/queries.hpp>
-#include <be/sqlite/stmt.hpp>
-#include <be/sqlite/transaction.hpp>
-#include <be/sqlite/static_stmt_cache.hpp>
+#include <be/util/get_file_contents.hpp>
 #include <be/util/keyword_parser.hpp>
+#include <be/sqlite/static_stmt_cache.hpp>
+#include <be/sqlite/transaction.hpp>
+#include <be/sqlite/queries.hpp>
 #include <pugixml/pugixml.hpp>
 #include <map>
 #include <set>
@@ -24,7 +22,7 @@ void create_registry_db(sqlite::Db& db) {
 
    sqlite::Transaction tx(db);
 
-   /*!! register_template_string([[`with each $ using # { nl `sqlite::exec(db, BEIDN_BGLGEN_SQL_`$`);`} nl]], 'exec_ids')
+   /*!!
    tables = {
       'comments', 'apis', 'profiles',
       'types', 'type_declarations', 'type_dependencies',
@@ -38,10 +36,16 @@ void create_registry_db(sqlite::Db& db) {
       'command_aliases_reverse',
       'api_component', 'type_component', 'enum_component', 'command_component'
    }
+   views = {
+      'features', 'extensions',
+      'type_components', 'enum_components', 'command_components',
+      'api_types', 'api_enums', 'api_group_enums'
+   }
 
    schema_ids = { 'CT_REGISTRY_INFO' }
    table_ids = { 'CT_REGISTRY_INFO' }
    index_ids = { }
+   view_ids = { }
    for i = 1, #tables do
       local id = 'CT_' .. string.upper(tables[i])
       schema_ids[#schema_ids+1] = id
@@ -52,8 +56,14 @@ void create_registry_db(sqlite::Db& db) {
       schema_ids[#schema_ids+1] = id
       index_ids[#index_ids+1] = id
    end
+   for i = 1, #views do
+      local id = 'CV_' .. string.upper(views[i])
+      schema_ids[#schema_ids+1] = id
+      view_ids[#view_ids+1] = id
+   end
    
-   write_template('exec_ids', schema_ids) !! 32 */
+   register_template_string([[`with each $ using # { nl `sqlite::exec(db, BEIDN_BGLGEN_SQL_`$`);`} nl]], 'exec_ids')
+   write_template('exec_ids', schema_ids) !! 40 */
    /* ################# !! GENERATED CODE -- DO NOT MODIFY !! ################# */
 
    sqlite::exec(db, BEIDN_BGLGEN_SQL_CT_REGISTRY_INFO);
@@ -83,6 +93,14 @@ void create_registry_db(sqlite::Db& db) {
    sqlite::exec(db, BEIDN_BGLGEN_SQL_CI_TYPE_COMPONENT);
    sqlite::exec(db, BEIDN_BGLGEN_SQL_CI_ENUM_COMPONENT);
    sqlite::exec(db, BEIDN_BGLGEN_SQL_CI_COMMAND_COMPONENT);
+   sqlite::exec(db, BEIDN_BGLGEN_SQL_CV_FEATURES);
+   sqlite::exec(db, BEIDN_BGLGEN_SQL_CV_EXTENSIONS);
+   sqlite::exec(db, BEIDN_BGLGEN_SQL_CV_TYPE_COMPONENTS);
+   sqlite::exec(db, BEIDN_BGLGEN_SQL_CV_ENUM_COMPONENTS);
+   sqlite::exec(db, BEIDN_BGLGEN_SQL_CV_COMMAND_COMPONENTS);
+   sqlite::exec(db, BEIDN_BGLGEN_SQL_CV_API_TYPES);
+   sqlite::exec(db, BEIDN_BGLGEN_SQL_CV_API_ENUMS);
+   sqlite::exec(db, BEIDN_BGLGEN_SQL_CV_API_GROUP_ENUMS);
 
    /* ######################### END OF GENERATED CODE ######################### */
 
@@ -99,7 +117,7 @@ void create_registry_db(sqlite::Db& db) {
 //////////////////////////////////////////////////////////////////////////////
 Id get_schema_checksum() {
    /*!! register_template_string([[static const Id checksum = Id(`with each $ using # { nl `   BEIDN_BGLGEN_SQL_` $ } nl `);]], 'schema_checksum')
-   write_template('schema_checksum', schema_ids) !! 32 */
+   write_template('schema_checksum', schema_ids) !! 40 */
    /* ################# !! GENERATED CODE -- DO NOT MODIFY !! ################# */
    static const Id checksum = Id(
       BEIDN_BGLGEN_SQL_CT_REGISTRY_INFO
@@ -129,6 +147,14 @@ Id get_schema_checksum() {
       BEIDN_BGLGEN_SQL_CI_TYPE_COMPONENT
       BEIDN_BGLGEN_SQL_CI_ENUM_COMPONENT
       BEIDN_BGLGEN_SQL_CI_COMMAND_COMPONENT
+      BEIDN_BGLGEN_SQL_CV_FEATURES
+      BEIDN_BGLGEN_SQL_CV_EXTENSIONS
+      BEIDN_BGLGEN_SQL_CV_TYPE_COMPONENTS
+      BEIDN_BGLGEN_SQL_CV_ENUM_COMPONENTS
+      BEIDN_BGLGEN_SQL_CV_COMMAND_COMPONENTS
+      BEIDN_BGLGEN_SQL_CV_API_TYPES
+      BEIDN_BGLGEN_SQL_CV_API_ENUMS
+      BEIDN_BGLGEN_SQL_CV_API_GROUP_ENUMS
    );
    /* ######################### END OF GENERATED CODE ######################### */
 
@@ -286,7 +312,7 @@ void parse_types(sqlite::StmtCache& cache, pugi::xml_node node) {
    auto select = cache.obtain("SELECT id FROM types WHERE name = ?");
    auto insert = cache.obtain("INSERT INTO types (id, name) VALUES (?, ?)");
    auto insert_decl = cache.obtain("INSERT INTO type_declarations (type_id, api_id, declaration, comment) VALUES (?, ?, ?, ?)");
-   auto insert_dep = cache.obtain("INSERT OR IGNORE INTO type_dependencies (dependent_type_id, nondependent_type_id) VALUES (?, ?)");
+   auto insert_dep = cache.obtain("INSERT OR IGNORE INTO type_dependencies (dependent_type_id, nondependent_type_id, api_id) VALUES (?, ?, ?)");
    for (pugi::xml_node type : node.children("type")) {
       const char* name;
       U64 id;
@@ -351,8 +377,10 @@ void parse_types(sqlite::StmtCache& cache, pugi::xml_node node) {
             U64 dependency = select.get_u64(0);
 
             insert_dep.reset();
+            insert_dep.bind();
             insert_dep.bind(1, id);
             insert_dep.bind(2, dependency);
+            if (api) insert_dep.bind(3, get_api_id(cache, api));
             insert_dep.step();
 
          } else {
@@ -497,7 +525,7 @@ void parse_commands(sqlite::StmtCache& cache, pugi::xml_node node, std::vector<s
    auto get_command = cache.obtain("SELECT id FROM commands WHERE name = ?");
    auto insert_command = cache.obtain("INSERT INTO commands (id, name, comment) VALUES (?, ?, ?)");
    auto insert_alias = cache.obtain("INSERT INTO command_aliases (preferred_id, alias_id, type) VALUES (?, ?, ?)");
-   auto insert_signature = cache.obtain("INSERT INTO command_signature (command_id, param_index, type_id, group_id, length, raw_length, declaration) VALUES (?, ?, ?, ?, ?, ?, ?)");
+   auto insert_signature = cache.obtain("INSERT INTO command_signature (command_id, param_index, type_id, group_id, length, raw_length, declaration, name) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
 
    for (pugi::xml_node command_elem : node.children("command")) {
       pugi::xml_node proto = command_elem.child("proto");
@@ -556,6 +584,7 @@ void parse_commands(sqlite::StmtCache& cache, pugi::xml_node node, std::vector<s
       if (type_id != U64(-1)) insert_signature.bind(3, type_id);
       if (group_id != U64(-1)) insert_signature.bind(4, group_id);
       insert_signature.bind(7, return_decl.c_str(), ( int ) return_decl.size());
+      insert_signature.bind(8, command_name);
       insert_signature.step();
 
       I32 param_index = 1;
@@ -592,10 +621,12 @@ void parse_commands(sqlite::StmtCache& cache, pugi::xml_node node, std::vector<s
                }
 
                S decl;
+               const char* param_name = nullptr;
                for (auto param_child : param_node.children()) {
                   if (param_child.type() != pugi::node_element) {
                      decl.append(param_child.value());
                   } else if (0 == strcmp(param_child.name(), "name")) {
+                     param_name = param_child.child_value();
                      break;
                   } else {
                      decl.append(param_child.child_value());
@@ -611,6 +642,7 @@ void parse_commands(sqlite::StmtCache& cache, pugi::xml_node node, std::vector<s
                if (length_end && 0 == *length_end) insert_signature.bind(5, length);
                insert_signature.bind(6, raw_length);
                insert_signature.bind(7, decl.c_str(), ( int ) decl.size());
+               insert_signature.bind(8, param_name);
                insert_signature.step();
 
                ++param_index;
@@ -663,9 +695,9 @@ void parse_feature(sqlite::StmtCache& cache, pugi::xml_node node) {
    auto get_command = cache.obtain("SELECT id FROM commands WHERE name = ?");
    auto insert = cache.obtain("INSERT INTO components (id, name, type, version_major, version_minor, comment) VALUES (?, ?, ?, ?, ?, ?)");
    auto insert_api = cache.obtain("INSERT INTO component_apis (component_id, api_id) VALUES (?, ?)");
-   auto insert_type = cache.obtain("INSERT INTO component_types (component_id, type_id, api_id, profile_id, action, comment) VALUES (?, ?, ?, ?, ?, ?)");
-   auto insert_enum = cache.obtain("INSERT INTO component_enums (component_id, enum_id, api_id, profile_id, action, comment) VALUES (?, ?, ?, ?, ?, ?)");
-   auto insert_command = cache.obtain("INSERT INTO component_commands (component_id, command_id, api_id, profile_id, action, comment) VALUES (?, ?, ?, ?, ?, ?)");
+   auto insert_type = cache.obtain("INSERT INTO component_types (component_id, type_id, api_id, profile_id, op, comment) VALUES (?, ?, ?, ?, ?, ?)");
+   auto insert_enum = cache.obtain("INSERT INTO component_enums (component_id, enum_id, api_id, profile_id, op, comment) VALUES (?, ?, ?, ?, ?, ?)");
+   auto insert_command = cache.obtain("INSERT INTO component_commands (component_id, command_id, api_id, profile_id, op, comment) VALUES (?, ?, ?, ?, ?, ?)");
 
    const char* feature_name = node.attribute("name").value();
    const char* api = node.attribute("api").value();
@@ -714,11 +746,11 @@ void parse_feature(sqlite::StmtCache& cache, pugi::xml_node node) {
          continue;
       }
 
-      bool action;
+      bool op;
       if (const char* tag = child.name(); 0 == strcmp(tag, "require")) {
-         action = true;
+         op = true;
       } else if (0 == strcmp(tag, "remove")) {
-         action = false;
+         op = false;
       } else {
          continue;
       }
@@ -756,7 +788,7 @@ void parse_feature(sqlite::StmtCache& cache, pugi::xml_node node) {
             insert_command.bind(2, command_id);
             insert_command.bind(3, get_api_id(cache, api));
             if (profile) insert_command.bind(4, get_profile_id(cache, profile));
-            insert_command.bind(5, action);
+            insert_command.bind(5, op);
             insert_command.bind(6, subcomment);
             insert_command.step();
 
@@ -781,7 +813,7 @@ void parse_feature(sqlite::StmtCache& cache, pugi::xml_node node) {
             insert_enum.bind(2, enum_id);
             insert_enum.bind(3, get_api_id(cache, api));
             if (profile) insert_enum.bind(4, get_profile_id(cache, profile));
-            insert_enum.bind(5, action);
+            insert_enum.bind(5, op);
             insert_enum.bind(6, subcomment);
             insert_enum.step();
 
@@ -806,7 +838,7 @@ void parse_feature(sqlite::StmtCache& cache, pugi::xml_node node) {
             insert_type.bind(2, type_id);
             insert_type.bind(3, get_api_id(cache, api));
             if (profile) insert_type.bind(4, get_profile_id(cache, profile));
-            insert_type.bind(5, action);
+            insert_type.bind(5, op);
             insert_type.bind(6, subcomment);
             insert_type.step();
          }
@@ -821,9 +853,9 @@ void parse_extensions(sqlite::StmtCache& cache, pugi::xml_node extensions) {
    auto get_command = cache.obtain("SELECT id FROM commands WHERE name = ?");
    auto insert = cache.obtain("INSERT INTO components (id, name, type, version_major, version_minor, comment) VALUES (?, ?, ?, ?, ?, ?)");
    auto insert_api = cache.obtain("INSERT INTO component_apis (component_id, api_id) VALUES (?, ?)");
-   auto insert_type = cache.obtain("INSERT INTO component_types (component_id, type_id, api_id, profile_id, action, comment) VALUES (?, ?, ?, ?, ?, ?)");
-   auto insert_enum = cache.obtain("INSERT INTO component_enums (component_id, enum_id, api_id, profile_id, action, comment) VALUES (?, ?, ?, ?, ?, ?)");
-   auto insert_command = cache.obtain("INSERT INTO component_commands (component_id, command_id, api_id, profile_id, action, comment) VALUES (?, ?, ?, ?, ?, ?)");
+   auto insert_type = cache.obtain("INSERT INTO component_types (component_id, type_id, api_id, profile_id, op, comment) VALUES (?, ?, ?, ?, ?, ?)");
+   auto insert_enum = cache.obtain("INSERT INTO component_enums (component_id, enum_id, api_id, profile_id, op, comment) VALUES (?, ?, ?, ?, ?, ?)");
+   auto insert_command = cache.obtain("INSERT INTO component_commands (component_id, command_id, api_id, profile_id, op, comment) VALUES (?, ?, ?, ?, ?, ?)");
 
    for (pugi::xml_node extension : extensions.children("extension")) {
       const char* extension_name = extension.attribute("name").value();
@@ -870,11 +902,11 @@ void parse_extensions(sqlite::StmtCache& cache, pugi::xml_node extensions) {
             continue;
          }
 
-         bool action;
+         bool op;
          if (const char* tag = child.name(); 0 == strcmp(tag, "require")) {
-            action = true;
+            op = true;
          } else if (0 == strcmp(tag, "remove")) {
-            action = false;
+            op = false;
          } else {
             continue;
          }
@@ -917,7 +949,7 @@ void parse_extensions(sqlite::StmtCache& cache, pugi::xml_node extensions) {
                insert_command.bind(2, command_id);
                if (api) insert_command.bind(3, get_api_id(cache, api));
                if (profile) insert_command.bind(4, get_profile_id(cache, profile));
-               insert_command.bind(5, action);
+               insert_command.bind(5, op);
                if (subcomment) insert_command.bind(6, subcomment);
                insert_command.step();
 
@@ -942,7 +974,7 @@ void parse_extensions(sqlite::StmtCache& cache, pugi::xml_node extensions) {
                insert_enum.bind(2, enum_id);
                if (api) insert_enum.bind(3, get_api_id(cache, api));
                if (profile) insert_enum.bind(4, get_profile_id(cache, profile));
-               insert_enum.bind(5, action);
+               insert_enum.bind(5, op);
                if (subcomment) insert_enum.bind(6, subcomment);
                insert_enum.step();
 
@@ -967,7 +999,7 @@ void parse_extensions(sqlite::StmtCache& cache, pugi::xml_node extensions) {
                insert_type.bind(2, type_id);
                if (api) insert_type.bind(3, get_api_id(cache, api));
                if (profile) insert_type.bind(4, get_profile_id(cache, profile));
-               insert_type.bind(5, action);
+               insert_type.bind(5, op);
                if (subcomment) insert_type.bind(6, subcomment);
                insert_type.step();
             }
@@ -1182,6 +1214,7 @@ sqlite::Db init_registry(const Path& xml_path, const Path& db_path, bool force_r
       s.step();
       
       sqlite::vacuum(db);
+      sqlite::analyze(db);
 
       be_short_info("") << "Finished building registry DB." | default_log();
    }

@@ -50,6 +50,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\bglgen_app.hpp" />
+    <ClInclude Include="include\bglgen_blt.hpp" />
     <ClInclude Include="include\bglgen_lua.hpp" />
     <ClInclude Include="include\gl_registry.hpp" />
     <ClInclude Include="include\lexer.hpp" />
@@ -58,6 +59,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="meta\bglgen.lua" />
+    <None Include="meta\bgl_default.blt" />
     <None Include="meta\lexer.rl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

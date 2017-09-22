@@ -13,12 +13,15 @@ tool 'bglgen' {
       link_project {
          'core',
          'core-id-with-names',
+         'core-lua',
          'util',
          'util-fs',
          'util-string',
+         'util-lua',
          'sqlite',
          'cli',
-         'blt'
+         'blt',
+         'blt-lua'
       }
    }
 }

@@ -38,6 +38,7 @@ namespace {
    bgl_unchecked =            bgl_prequel 'unchecked' ;
    bgl_weight =               bgl_prequel 'weight' optional_whitespace '(' optional_whitespace digit+ optional_whitespace ')' ;
    bgl_reset_weight =         bgl_prequel 'weight' ;
+   bgl_malformed =            bgl_prequel identifier ;
 
    escape_seq =               '\\' ( [abfnrtv?\\'"] | odigit{1,3} | 'x' xdigit+ | 'u' xdigit{4} | 'U' xdigit{8} ) ;
    s_char =                   alnum | [ \t\v\f_{}\[\]#()<>%:;.?*+\-/^&|~!=,\'] | ^ascii | escape_seq ;
@@ -51,7 +52,7 @@ namespace {
       bgl_unchecked => { check_ = S(); };
       bgl_weight => { set_weight_(); };
       bgl_reset_weight => { weight_ = 100; };
-	  bgl_prequel => { bgl_malformed_(); };
+	  bgl_malformed => { bgl_malformed_(); };
       newline => { ls_ = te_; ++line_; };
       string_literal => {};
       single_line_comment => {};

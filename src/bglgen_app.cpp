@@ -15,6 +15,7 @@
 #include <be/util/path_glob.hpp>
 #include <be/util/get_file_contents.hpp>
 #include <be/util/put_file_contents.hpp>
+#include <be/util/line_endings.hpp>
 #include <be/util/lua_modules.hpp>
 #include <be/cli/cli.hpp>
 #include <be/blt/lua_modules.hpp>
@@ -72,7 +73,7 @@ Path lua_get_path(lua_State* L, const char* global) {
 void find_symbols_in_file(const Path& path, std::unordered_multimap<S, SymbolUsage>& symbols, I8& status) {
    be_short_debug("") << "Parsing source file: " << path.generic_string() | default_log();
    try {
-      S data = util::get_file_contents_string(path);
+      S data = util::get_text_file_contents_string(path);
       std::unordered_multimap<S, SymbolUsage> local_symbols;
       Lexer lex(path, data, local_symbols);
       lex();
@@ -674,11 +675,7 @@ int BglGenApp::operator()() {
       if (lua_type(context_.L(), -1) == LUA_TSTRING) {
          std::size_t len;
          const char* ptr = lua_tolstring(context_.L(), -1, &len);
-         if (ptr) {
-            result.assign(ptr, len);
-            std::regex lf_re = std::regex("\\r\\n?|\\n");
-            result = std::regex_replace(result, lf_re, preferred_line_ending());
-         }
+         result = util::normalize_newlines_copy(SV(ptr, len));
       }
 
       if (output_location_.empty()) {
@@ -686,7 +683,7 @@ int BglGenApp::operator()() {
          std::cout.flush();
       } else {
          if (fs::exists(output_location_)) {
-            S current = util::get_file_contents_string(output_location_);
+            S current = util::get_text_file_contents_string(output_location_);
             if (current != result) {
                util::put_text_file_contents(output_location_, result);
             }

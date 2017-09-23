@@ -1,7 +1,7 @@
 #include "bglgen_app.hpp"
-#include "lexer.hpp"
 #include "bglgen_lua.hpp"
 #include "bglgen_blt.hpp"
+#include "ids.hpp"
 #include "version.hpp"
 #include "gl_registry.hpp"
 #include <be/core/version.hpp>
@@ -10,12 +10,14 @@
 #include <be/core/log_exception.hpp>
 #include <be/core/console_log_sink.hpp>
 #include <be/core/lua_modules.hpp>
+#include <be/core/service_simple_thread_pool_executor.hpp>
+#include <be/core/service_simple_inline_executor.hpp>
 #include <be/util/path_glob.hpp>
 #include <be/util/get_file_contents.hpp>
+#include <be/util/put_file_contents.hpp>
 #include <be/util/lua_modules.hpp>
 #include <be/cli/cli.hpp>
 #include <be/blt/lua_modules.hpp>
-#include <be/belua/context.hpp>
 #include <be/belua/lua_helpers.hpp>
 #include <be/belua/log_exception.hpp>
 #include <be/sqlite/static_stmt_cache.hpp>
@@ -45,6 +47,87 @@ S inflate_bgl_default_template() {
 #endif
 }
 
+//////////////////////////////////////////////////////////////////////////////
+void load_bgl_default_template(lua_State* L) {
+   S bgl_default_template = inflate_bgl_default_template();
+   lua_getglobal(L, "register_template_string");
+   lua_pushlstring(L, bgl_default_template.c_str(), ( int ) bgl_default_template.size());
+   lua_pushstring(L, "bgl_default");
+   belua::ecall(L, 2, 0);
+}
+
+//////////////////////////////////////////////////////////////////////////////
+Path lua_get_path(lua_State* L, const char* global) {
+   Path p;
+   if (LUA_TSTRING == lua_getglobal(L, global)) {
+      std::size_t len;
+      const char* path = lua_tolstring(L, -1, &len);
+      p = Path(path, path + len);
+   }
+   lua_pop(L, 1);
+   return p;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+void find_symbols_in_file(const Path& path, std::unordered_multimap<S, SymbolUsage>& symbols, I8& status) {
+   be_short_debug("") << "Parsing source file: " << path.generic_string() | default_log();
+   try {
+      S data = util::get_file_contents_string(path);
+      std::unordered_multimap<S, SymbolUsage> local_symbols;
+      Lexer lex(path, data, local_symbols);
+      lex();
+
+      if (!local_symbols.empty()) {
+         // post the results back to the main thread's symbols map
+         service<SimpleInlineExecutor>(ids::bglgen_service_simple_inline_executor_foreground).post(
+            [&symbols, s { std::move(local_symbols) }]() {
+               symbols.insert(s.begin(), s.end());
+            });
+      }
+      return;
+   } catch (const fs::filesystem_error& e) {
+      log_exception(e);
+   } catch (const std::system_error& e) {
+      log_exception(e);
+   } catch (const std::exception& e) {
+      log_exception(e);
+   }
+
+   // an error occurred, set status flag
+   service<SimpleInlineExecutor>(ids::bglgen_service_simple_inline_executor_foreground).post(
+      [&status]() { status = 3; });
+}
+
+///////////////////////////////////////////////////////////////////////////////
+void find_symbols_in_dir(const Path& path, const S& extensions_regex, util::PathMatchType type, std::unordered_multimap<S, SymbolUsage>& symbols, I8& status) {
+   try {
+      Path base = fs::absolute(path);
+      if (fs::exists(base)) {
+         std::vector<Path> paths = util::greb(".*\\.(" + extensions_regex + ")", base, type);
+         if (!paths.empty()) {
+            auto& bg_executor = service<SimpleThreadPoolExecutor>(ids::bglgen_service_simple_thread_pool_executor_background);
+            for (Path& p : paths) {
+               be_short_debug("") << "Parsing source file: " << p.generic_string() | default_log();
+               bg_executor.post([&,p]() { find_symbols_in_file(p, symbols, status); });
+            }
+         }
+      } else {
+         throw fs::filesystem_error("Path does not exist!", std::make_error_code(std::errc::not_a_directory));
+      }
+      return;
+   } catch (const fs::filesystem_error& e) {
+      log_exception(e);
+   } catch (const std::system_error& e) {
+      log_exception(e);
+   } catch (const std::exception& e) {
+      log_exception(e);
+   }
+
+   // an error occurred, set status flag
+   service<SimpleInlineExecutor>(ids::bglgen_service_simple_inline_executor_foreground).post(
+      [&status]() { status = 3; });
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 void add_gl_data(lua_State* L, const char* global_name, bool sort_by_weight, std::unordered_map<S, U32>& map, std::unordered_multimap<S, SymbolUsage>& multimap) {
    std::vector<S> sorted;
@@ -67,26 +150,6 @@ void add_gl_data(lua_State* L, const char* global_name, bool sort_by_weight, std
          return a < b;
       });
    }
-
-   /* We're trying to make a table like this:
-      {
-         {
-            name = 'glXXXXX',
-            weight = 100,
-            used_unchecked = true,
-            refs = {
-               {
-                  path = '...',
-                  weight = 100,
-                  line = 1337,
-                  checked = true
-               }
-            },
-            { ... },
-            ...
-         }
-      }
-   */
 
    lua_settop(L, 0);
    lua_createtable(L, ( int ) sorted.size(), 0); // 1
@@ -157,6 +220,10 @@ sqlite::StaticStmtCache* cache = nullptr;
 // gl_registry.query('SELECT ...', paramA, paramB) -> singleRowColumnA, singleRowColumnB, ...
 // gl_registry.query('SELECT ...', paramA, paramB) -> { { rowAcolumnA, rowAcolumnB, ... }, { rowBcolumnA, ... }, ... }
 int gl_registry_query(lua_State* L) {
+   if (!cache) {
+      luaL_error(L, "GL registry not yet initialized!");
+   }
+
    const char* query = luaL_checkstring(L, 1);
    auto stmt = cache->obtain(query);
 
@@ -333,110 +400,104 @@ BglGenApp::BglGenApp(int argc, char** argv) {
       bool verbose = false;
       S help_query;
 
-      S ext_regex = "c|cc|cxx|cpp|hpp|inl";
-
       proc
-      (prologue(Table() << header << "BENGINE GL EXTENSION LOADER GENERATOR").query())
+         (prologue(Table() << header << "BENGINE GL EXTENSION LOADER GENERATOR").query())
 
-      (synopsis(Cell() << fg_dark_gray << "[ " << fg_cyan << "OPTIONS"
-                       << fg_dark_gray << " ] " << fg_cyan << "SOURCE_DIRS"))
+         (synopsis(Cell() << fg_dark_gray << "[ " << fg_cyan << "OPTIONS" << fg_dark_gray << " ] " << fg_cyan << "SOURCE_DIRS"))
 
-      (abstract("BGLgen is different from most other OpenGL extension loaders.  Instead of generating code for every function, "
-                "enum, version, extension, etc. it will search through the source files of your OpenGL program, looking for symbols "
-                "that look like GL calls or constants and generate bindings only for those symbols which you actually need."))
+         (abstract("BGLgen is different from most other OpenGL extension loaders.  Instead of generating code for every function, "
+            "enum, version, extension, etc. it will search through the source files of your OpenGL program, looking for symbols "
+            "that look like GL calls or constants and generate bindings only for those symbols which you actually need."))
 
-      (abstract(Cell() << "Each argument in " << fg_cyan << "SOURCE_DIRS" << fg_reset << " corresponds to a directory which will "
+         (abstract(Cell() << "Each argument in " << fg_cyan << "SOURCE_DIRS" << fg_reset << " corresponds to a directory which will "
             "be recursively searched for source files.").verbose())
 
-      (abstract(Cell() << "Output will always be printed to standard output.  Much of the code generation is done via internal Lua scripts.  "
-             "If a file named " << fg_blue << ".bglgenrc" << reset << " exists in the working directory or a parent directory, it will be "
-             "loaded after the internal scripts and before code generation begins.  This allows overriding various hooks to customize the "
-             "format and behavior of the generator.").verbose())
+         (abstract(Cell() << "Output will always be printed to standard output.  Much of the code generation is done via internal Lua scripts.  "
+            "If a file named " << fg_blue << ".bglgenrc" << reset << " exists in the working directory or a parent directory, it will be "
+            "loaded after the internal scripts and before code generation begins.  This allows overriding various hooks to customize the "
+            "format and behavior of the generator.").verbose())
 
-      (param({ }, { "registry" }, "PATH", [&](const S& path) {
-            registry_location_ = path;
-         }).desc("Specifies the location of the OpenGL registry (gl.xml).")
+         (param({ }, { "registry" }, "PATH", [&](const S& path) {
+               registry_location_ = path;
+            }).desc("Specifies the location of the OpenGL registry (gl.xml).")
             .extra(Cell() << "If not provided, BGLgen will recursively check the current directory and it parent directories "
-                             "until it finds a file called " << fg_blue << "gl.xml" << reset << " or the filesystem root is reached."))
+               "until it finds a file called " << fg_blue << "gl.xml" << reset << " or the filesystem root is reached."))
 
-      (param({ }, { "db" }, "PATH", [&](const S& path) {
-         }).desc("Specifies the location to store the registry database.")
+         (param({ }, { "db" }, "PATH", [&](const S& path) {
+               registry_db_location_ = path;
+            }).desc("Specifies the location to store the registry database.")
             .extra(Cell() << "If not provided, the database file will be in the same directory as the registry, with " << fg_blue << ".db"
-                          << reset << " appended to the file name."))
+               << reset << " appended to the file name."))
 
-      (flag({ }, { "rebuild-db" }, rebuild_db_)
-         .desc("Forces the registry database to be rebuilt even if its checksum matches the XML registry."))
+         (flag({ "m" }, { "mem-db" }, registry_db_location_, Path(":memory:"))
+            .desc("Store the GL registry into an in memory instead of on disk.")
+            .extra(Cell() << "Equivalent to " << fg_yellow << "--db  " << fg_cyan << ":memory:" << reset << "."))
 
-      (param({ "x" }, { "extensions" }, "EXT", ext_regex)
-         .desc("Specifies which types of files to consider source files when searching directories.")
-         .extra("Only affects directories specified after it on the command line, and overrides any previous value."))
+         (flag({ }, { "rebuild-db" }, rebuild_db_)
+            .desc("Forces the registry database to be rebuilt even if its checksum matches the XML registry."))
 
-      (param({ "d" }, { "dir" }, "PATH", [&](const S& path) {
-            Path base = fs::absolute(path);
-            if (fs::exists(base)) {
-               std::vector<Path> paths = util::glob("*.*", base, util::PathMatchType::files);
-               std::regex ext_re(ext_regex);
-               for (Path& p : paths) {
-                  if (std::regex_match(p.extension().string().substr(1), ext_re)) {
-                     source_paths_.push_back(p);
-                  }
-               }
-            } else {
-               throw fs::filesystem_error("Path does not exist!", std::make_error_code(std::errc::not_a_directory));
-            }
-         }).desc("Specifies a single directory to search non-recursively for source files."))
+         (param({ "x" }, { "extensions" }, "EXT", [&](const S& extensions) {
+               extension_regex_ = extensions;
+            })
+            .desc("Specifies which types of files to consider source files when searching directories.")
+            .extra(Cell() << "Default value: " << color::fg_cyan << "c|cc|cxx|cpp|hpp|inl" << color::reset)
+            .extra("Only affects directories specified after it on the command line, and overrides any previous value."))
 
-      (param({ "f" }, { "file" }, "PATH", [&](const S& path) {
-            source_paths_.push_back(path);
-         }).desc("Specifies a single source file to search for GL usages."))
+         (param({ "d" }, { "dir" }, "PATH", [&](const S& path) {
+               search_dirs_.push_back(std::make_pair(Path(path), false));
+            }).desc("Specifies a single directory to search non-recursively for source files."))
 
-      (any([&](const S& path) {
-            Path base = fs::absolute(path);
-            if (fs::exists(base)) {
-               std::vector<Path> paths = util::glob("*.*", base, util::PathMatchType::recursive_files_and_dirs);
-               std::regex ext_re(ext_regex);
-               for (Path& p : paths) {
-                  if (std::regex_match(p.extension().string().substr(1), ext_re)) {
-                     source_paths_.push_back(p);
-                  }
-               }
-            } else {
-               throw fs::filesystem_error("Path does not exist!", std::make_error_code(std::errc::not_a_directory));
-            }
-            return true;
-         }))
+         (param({ "f" }, { "file" }, "PATH", [&](const S& path) {
+               source_paths_.push_back(path);
+            }).desc("Specifies a single source file to search for GL usages."))
 
-      (param({ "p" }, { "pre-execute" }, "LUA", [&](const S& lua) {
-            lua_chunks_.push_back(lua);
-         }).desc("Execues the specified lua command after finding GL symbols in the input files.")
+         (param({ "o" }, { "output" }, "PATH", [&](const S& path) {
+               output_location_ = path;
+            }))
+
+         (any([&](const S& path) {
+               search_dirs_.push_back(std::make_pair(Path(path), true));
+               return true;
+            }))
+
+         (param({ "p" }, { "pre-execute" }, "LUA", [&](const S& lua) {
+               lua_chunks_.push_back(lua);
+            }).desc("Execues the specified lua command after finding GL symbols in the input files.")
             .extra(Cell() << "The default " << fg_cyan << "process()" << reset << " function will be called "
-                             "afterwards unless it is overridden by an " << fg_yellow << "--execute"))
+               "afterwards unless it is overridden by an " << fg_yellow << "--execute"))
 
-      (param({ "e" }, { "execute" }, "LUA", [&](const S& lua) {
-            lua_chunks_.push_back(lua);
-            do_process_ = false;
-         }).desc("Replaces the default task run after finding GL symbols in the input files.")
+         (param({ "e" }, { "execute" }, "LUA", [&](const S& lua) {
+               lua_chunks_.push_back(lua);
+               do_process_ = false;
+            }).desc("Replaces the default task run after finding GL symbols in the input files.")
             .extra(Cell() << "If no " << fg_yellow << "--execute" << reset << " options are specified, "
-                             "then the default " << fg_cyan << "process()" << reset << " function will be called."))
+               "then the default " << fg_cyan << "process()" << reset << " function will be called."))
 
-      (end_of_options())
+         (end_of_options())
 
-      (verbosity_param({ "v" }, { "verbosity" }, "LEVEL", default_log().verbosity_mask()))
+         (verbosity_param({ "v" }, { "verbosity" }, "LEVEL", default_log().verbosity_mask()))
 
-      (flag({ "V" }, { "version" }, show_version).desc("Prints version information to standard output."))
+         (flag({ "V" }, { "version" }, show_version)
+            .desc("Prints version information to standard output."))
 
-      (param({ "?" }, { "help" }, "OPTION", [&](const S& value) {
-            show_help = true;
-            help_query = value;
-         }).default_value(S())
+         (param({ "?" }, { "help" }, "OPTION", [&](const S& value) {
+               show_help = true;
+               help_query = value;
+            }).default_value(S())
             .allow_options_as_values(true)
             .desc(Cell() << "Outputs this help message.  For more verbose help, use " << fg_yellow << "--help")
             .extra(Cell() << nl << "If " << fg_cyan << "OPTION" << reset
-                          << " is provided, the options list will be filtered to show only options that contain that string."))
+               << " is provided, the options list will be filtered to show only options that contain that string."))
 
-      (flag({ }, { "help" }, verbose).ignore_values(true))
+         (flag({ }, { "help" }, verbose).ignore_values(true))
 
-      ;
+         (exit_code(0, "There were no errors."))
+         (exit_code(1, "Command line error."))
+         (exit_code(2, "OpenGL registry initialization failed."))
+         (exit_code(3, "Error searching for source files or GL symbols."))
+         (exit_code(4, "Lua error or filesystem error while writing output file."))
+
+         ;
 
       proc.process(argc, argv);
 
@@ -451,33 +512,33 @@ BglGenApp::BglGenApp(int argc, char** argv) {
 
       if (show_help) {
          proc.describe(std::cout, verbose, help_query);
-         status_ = 2;
+         status_ = 1;
       } else if (show_version) {
          proc.describe(std::cout, verbose, ids::cli_describe_section_prologue);
          proc.describe(std::cout, verbose, ids::cli_describe_section_license);
-         status_ = 2;
+         status_ = 1;
       }
 
    } catch (const cli::OptionError& e) {
-      status_ = 2;
+      status_ = 1;
       cli::log_exception(e);
    } catch (const cli::ArgumentError& e) {
-      status_ = 2;
+      status_ = 1;
       cli::log_exception(e);
    } catch (const FatalTrace& e) {
-      status_ = 2;
+      status_ = 1;
       log_exception(e);
    } catch (const RecoverableTrace& e) {
-      status_ = 2;
+      status_ = 1;
       log_exception(e);
    } catch (const fs::filesystem_error& e) {
-      status_ = 2;
+      status_ = 1;
       log_exception(e);
    } catch (const std::system_error& e) {
-      status_ = 2;
+      status_ = 1;
       log_exception(e);
    } catch (const std::exception& e) {
-      status_ = 2;
+      status_ = 1;
       log_exception(e);
    }
 }
@@ -488,96 +549,8 @@ int BglGenApp::operator()() {
       return status_;
    }
 
-   sqlite::Db db;
-
    try {
-      if (registry_location_.empty()) {
-         Path p = util::cwd();
-         for (;;) {
-            if (Path gl = p / "gl.xml"; fs::exists(gl)) {
-               registry_location_ = gl;
-               break;
-            }
-
-            if (p == p.root_path()) {
-               break;
-            }
-
-            p = p.parent_path();
-         }
-      }
-
-      db = init_registry(registry_location_, registry_db_location_, rebuild_db_);
-
-   } catch (const sqlite::SqlTrace& e) {
-      log_exception(e);
-      return 1;
-   } catch (const sqlite::SqlError& e) {
-      log_exception(e);
-      return 1;
-   } catch (const fs::filesystem_error& e) {
-      log_exception(e);
-      return 1;
-   } catch (const std::system_error& e) {
-      log_exception(e);
-      return 1;
-   } catch (const std::exception& e) {
-      log_exception(e);
-      return 1;
-   }
-
-   sqlite::StaticStmtCache db_cache(db);
-   cache = &db_cache;
-
-   std::unordered_multimap<S, SymbolUsage> symbols;
-   for (Path& p : source_paths_) {
-      be_short_debug("") << "Source Path: " << p.generic_string() | default_log();
-      try {
-         S data = util::get_file_contents_string(p);
-         Lexer lex(p, data, symbols);
-         lex();
-
-      } catch (const fs::filesystem_error& e) {
-         log_exception(e);
-      } catch (const std::system_error& e) {
-         log_exception(e);
-      } catch (const std::exception& e) {
-         log_exception(e);
-      }
-   }
-
-   source_paths_.clear(); // don't need this anymore; clear up some memory
-
-   std::unordered_map<S, U32> unique_functions;
-   std::unordered_map<S, U32> unique_constants;
-
-   for (auto& sym : symbols) {
-      if (sym.first[0] == 'g') {
-         if (unique_functions.count(sym.first) > 0) {
-            unique_functions[sym.first] += sym.second.weight;
-         } else {
-            unique_functions[sym.first] = sym.second.weight;
-         }
-      } else {
-         if (unique_constants.count(sym.first) > 0) {
-            unique_constants[sym.first] += sym.second.weight;
-         } else {
-            unique_constants[sym.first] = sym.second.weight;
-         }
-      }
-      if (sym.second.check.empty()) {
-         be_short_debug("") << "Unchecked GL Symbol: " << S(sym.first) << " (" << sym.second.path.generic_string() << " : " << sym.second.line << ")" | default_log();
-      } else {
-         be_short_debug("") << "Checked GL Symbol: " << S(sym.first) << " (" << sym.second.path.generic_string() << " : " << sym.second.line << ")" | default_log();
-      }
-   }
-
-   be_short_verbose("") << "Found " << symbols.size() << " references to " << unique_functions.size() << " functions and " << unique_constants.size() << " constants/types." | default_log();
-
-   try {
-      sqlite::Transaction tx(db);
-
-      belua::Context context({
+      context_ = belua::Context({
          belua::id_module,
          belua::logging_module,
          belua::interpolate_string_module,
@@ -595,48 +568,132 @@ int BglGenApp::operator()() {
          { nullptr, nullptr }
       };
 
-      luaL_newlib(context.L(), fn);
-      lua_setglobal(context.L(), "gl_registry");
+      luaL_newlib(context_.L(), fn);
+      lua_setglobal(context_.L(), "gl_registry");
 
-      add_gl_data(context.L(), "found_functions", true, unique_functions, symbols);
-      unique_functions.clear(); // don't need this anymore; clear up some memory
-      add_gl_data(context.L(), "found_constants", false, unique_constants, symbols);
-      unique_constants.clear(); // don't need this anymore; clear up some memory
-      symbols.clear(); // don't need this anymore; clear up some memory
+      context_.execute(inflate_bglgen_core(), "@BGLgen core"); // also loads .bglrc
+      get_lua_defaults_();
 
-      context.execute(inflate_bglgen_core(), "@BGLgen core");
+      std::unordered_multimap<S, SymbolUsage> symbols;
 
-      {
-         S bgl_default_template = inflate_bgl_default_template();
-         lua_getglobal(context.L(), "register_template_string");
-         lua_pushlstring(context.L(), bgl_default_template.c_str(), ( int ) bgl_default_template.size());
-         lua_pushstring(context.L(), "bgl_default");
-         belua::ecall(context.L(), 2, 0);
+      if (!search_dirs_.empty() || !source_paths_.empty()) {
+         init_extension_regex_();
+
+         auto& fg_executor = service<SimpleInlineExecutor>(ids::bglgen_service_simple_inline_executor_foreground);
+         auto& bg_executor = service<SimpleThreadPoolExecutor>(ids::bglgen_service_simple_thread_pool_executor_background);
+         bg_executor.threads(std::thread::hardware_concurrency());
+
+         for (auto& p : search_dirs_) {
+            auto& dir_path = p.first;
+            auto type = p.second ? util::PathMatchType::recursive_files : util::PathMatchType::files;
+            bg_executor.post(
+               [&,type]() {
+                  find_symbols_in_dir(dir_path, extension_regex_, type, symbols, status_);
+               });
+         }
+
+         for (auto& file_path : source_paths_) {
+            bg_executor.post(
+               [&]() {
+                  find_symbols_in_file(file_path, symbols, status_);
+               });
+         }
+
+         load_bgl_default_template(context_.L());
+         init_registry_();
+
+         while (!bg_executor.empty()) {
+            if (!fg_executor.run()) {
+               std::this_thread::yield();
+            }
+         }
+
+         bg_executor.shutdown();
+         fg_executor.shutdown();
+         fg_executor.run();
+
+         search_dirs_.clear();
+         source_paths_.clear();
+
+      } else {
+         load_bgl_default_template(context_.L());
+         init_registry_();
       }
 
-      for (S& lua : lua_chunks_) {
-         context.execute(lua, "@--execute Chunk");
+      if (status_ != 0) {
+         return status_;
       }
 
-      if (do_process_) {
-         lua_getglobal(context.L(), "process");
-         belua::ecall(context.L(), 0, 0);
-      }
+      std::unordered_map<S, U32> unique_functions;
+      std::unordered_map<S, U32> unique_constants;
 
-      S result;
-      lua_getglobal(context.L(), "reset");
-      belua::ecall(context.L(), 0, 1);
-      
-      if (lua_type(context.L(), -1) == LUA_TSTRING) {
-         std::size_t len;
-         const char* ptr = lua_tolstring(context.L(), -1, &len);
-         if (ptr) {
-            result.assign(ptr, len);
+      for (auto& sym : symbols) {
+         if (sym.first[0] == 'g') {
+            if (unique_functions.count(sym.first) > 0) {
+               unique_functions[sym.first] += sym.second.weight;
+            } else {
+               unique_functions[sym.first] = sym.second.weight;
+            }
+         } else {
+            if (unique_constants.count(sym.first) > 0) {
+               unique_constants[sym.first] += sym.second.weight;
+            } else {
+               unique_constants[sym.first] = sym.second.weight;
+            }
+         }
+         if (sym.second.check.empty()) {
+            be_short_debug("") << "Unchecked GL Symbol: " << S(sym.first) << " (" << sym.second.path.generic_string() << " : " << sym.second.line << ")" | default_log();
+         } else {
+            be_short_debug("") << "Checked GL Symbol: " << S(sym.first) << " (" << sym.second.path.generic_string() << " : " << sym.second.line << ")" | default_log();
          }
       }
 
-      std::cout << result;
-      std::cout.flush();
+      be_short_verbose("") << "Found " << symbols.size() << " references to " << unique_functions.size() << " functions and " << unique_constants.size() << " constants/types." | default_log();
+
+      add_gl_data(context_.L(), "found_functions", true, unique_functions, symbols);
+      unique_functions.clear();
+      add_gl_data(context_.L(), "found_constants", false, unique_constants, symbols);
+      unique_constants.clear();
+      symbols.clear();
+
+      sqlite::Transaction tx(db_);
+
+      for (S& lua : lua_chunks_) {
+         context_.execute(lua, "@--execute Chunk");
+      }
+
+      if (do_process_) {
+         lua_getglobal(context_.L(), "process");
+         belua::ecall(context_.L(), 0, 0);
+      }
+
+      lua_getglobal(context_.L(), "reset");
+      belua::ecall(context_.L(), 0, 1);
+      
+      S result;
+      if (lua_type(context_.L(), -1) == LUA_TSTRING) {
+         std::size_t len;
+         const char* ptr = lua_tolstring(context_.L(), -1, &len);
+         if (ptr) {
+            result.assign(ptr, len);
+            std::regex lf_re = std::regex("\\r\\n?|\\n");
+            result = std::regex_replace(result, lf_re, preferred_line_ending());
+         }
+      }
+
+      if (output_location_.empty()) {
+         std::cout << result;
+         std::cout.flush();
+      } else {
+         if (fs::exists(output_location_)) {
+            S current = util::get_file_contents_string(output_location_);
+            if (current != result) {
+               util::put_text_file_contents(output_location_, result);
+            }
+         } else {
+            util::put_text_file_contents(output_location_, result);
+         }
+      }
 
    } catch (const sqlite::SqlTrace& e) {
       status_ = 4;
@@ -668,6 +725,130 @@ int BglGenApp::operator()() {
    }
 
    return status_;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+void BglGenApp::get_lua_defaults_() {
+   lua_State* L = context_.L();
+   
+   if (registry_location_.empty()) {
+      registry_location_ = lua_get_path(L, "default_registry_path");
+   }
+
+   if (registry_db_location_.empty()) {
+      registry_db_location_ = lua_get_path(L, "default_registry_db_path");
+   }
+
+   if (output_location_.empty()) {
+      output_location_ = lua_get_path(L, "default_output_path");
+   }
+
+   if (search_dirs_.empty() && source_paths_.empty()) {
+      if (LUA_TTABLE == lua_getglobal(L, "default_search_paths")) {
+         lua_Integer n = (lua_Integer)lua_rawlen(L, -1);
+         for (lua_Integer i = 1; i <= n; ++i) {
+            if (LUA_TSTRING == lua_rawgeti(L, -1, i)) {
+               std::size_t len;
+               const char* path = lua_tolstring(L, -1, &len);
+               search_dirs_.push_back(std::make_pair(Path(path, path + len), true));
+            }
+            lua_pop(L, 1);
+         }
+      }
+      lua_pop(L, 1);
+   }
+
+   if (!search_dirs_.empty() && extensions_.empty() && extension_regex_.empty()) {
+      auto type = lua_getglobal(L, "default_source_extensions");
+      if (LUA_TTABLE == type) {
+         lua_Integer n = (lua_Integer)lua_rawlen(L, -1);
+         for (lua_Integer i = 1; i <= n; ++i) {
+            if (LUA_TSTRING == lua_rawgeti(L, -1, i)) {
+               std::size_t len;
+               const char* ext = lua_tolstring(L, -1, &len);
+               extensions_.push_back(S(ext, ext + len));
+            }
+            lua_pop(L, 1);
+         }
+      } else if (LUA_TSTRING == type) {
+         std::size_t len;
+         const char* re = lua_tolstring(L, -1, &len);
+         extension_regex_.assign(re, re + len);
+      }
+      lua_pop(L, 1);
+   }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+void BglGenApp::init_registry_() {
+   try {
+      if (registry_location_.empty()) {
+         Path p = util::cwd();
+         for (;;) {
+            if (Path gl = p / "gl.xml"; fs::exists(gl)) {
+               registry_location_ = gl;
+               break;
+            }
+
+            if (p == p.root_path()) {
+               break;
+            }
+
+            p = p.parent_path();
+         }
+      }
+
+      if (registry_location_.empty()) {
+         throw fs::filesystem_error("XML registry not found!", std::make_error_code(std::errc::no_such_file_or_directory));
+      }
+
+      if (registry_db_location_.empty()) {
+         registry_db_location_ = fs::canonical(registry_location_).string() + ".db";
+      }
+
+      db_ = init_registry(registry_location_, registry_db_location_, rebuild_db_);
+      cache_ = std::make_unique<sqlite::StaticStmtCache>(db_);
+      cache = cache_.get();
+
+   } catch (const sqlite::SqlTrace& e) {
+      log_exception(e);
+      status_ = 2;
+   } catch (const sqlite::SqlError& e) {
+      log_exception(e);
+      status_ = 2;
+   } catch (const fs::filesystem_error& e) {
+      log_exception(e);
+      status_ = 2;
+   } catch (const std::system_error& e) {
+      log_exception(e);
+      status_ = 2;
+   } catch (const std::exception& e) {
+      log_exception(e);
+      status_ = 2;
+   }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+void BglGenApp::init_extension_regex_() {
+   if (!extensions_.empty()) {
+      for (const S& ext : extensions_) {
+         if (ext.empty()) {
+            continue;
+         }
+
+         if (!extension_regex_.empty()) {
+            extension_regex_.append(1, '|');
+         }
+
+         extension_regex_.append(ext);
+      }
+
+      extensions_.clear();
+   }
+
+   if (extension_regex_.empty()) {
+      extension_regex_ = "c|cc|cxx|cpp|hpp|inl";
+   }
 }
 
 } // be::bglgen

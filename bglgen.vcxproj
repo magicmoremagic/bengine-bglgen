@@ -55,6 +55,7 @@
     <ClCompile Include="src\bglgen.cpp" />
     <ClCompile Include="src\bglgen_app.cpp" />
     <ClCompile Include="src\gl_registry.cpp" />
+    <ClCompile Include="src\ids.cpp" />
     <ClCompile Include="src\lexer.cpp" />
     <ClCompile Include="src\pugi.cpp" />
   </ItemGroup>
@@ -63,6 +64,7 @@
     <ClInclude Include="include\bglgen_blt.hpp" />
     <ClInclude Include="include\bglgen_lua.hpp" />
     <ClInclude Include="include\gl_registry.hpp" />
+    <ClInclude Include="include\ids.hpp" />
     <ClInclude Include="include\lexer.hpp" />
     <ClInclude Include="include\sql_ids.hpp" />
     <ClInclude Include="include\version.hpp" />

@@ -1015,8 +1015,7 @@ sqlite::Db init_registry(const Path& xml_path, const Path& db_path, bool force_r
    sqlite::Db db;
 
    be_short_verbose("") << "Registry Location: " << xml_path.generic_string() | default_log();
-   Path sqlite_path = db_path.empty() ? (fs::canonical(xml_path).string() + ".db") : db_path;
-   be_short_verbose("") << "Registry DB Location: " << sqlite_path.generic_string() | default_log();
+   be_short_verbose("") << "Registry DB Location: " << db_path.generic_string() | default_log();
 
    S raw_xml = util::get_file_contents_string(xml_path);
    Id xml_checksum = Id(raw_xml);
@@ -1026,8 +1025,12 @@ sqlite::Db init_registry(const Path& xml_path, const Path& db_path, bool force_r
    bool clear_db = false;
    bool parse_xml = false;
 
-   if (fs::exists(sqlite_path)) {
-      db = sqlite::Db(sqlite_path.string());
+   if (":memory:" == db_path) {
+      db = sqlite::Db(":memory:");
+      create_db = true;
+      parse_xml = true;
+   } else if (fs::exists(db_path)) {
+      db = sqlite::Db(db_path.string());
       sqlite::Stmt s_info_exists = sqlite::Stmt(db, "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'registry_info' LIMIT 1");
       if (!s_info_exists.step()) {
          be_short_info("") << "Registry DB appears to be corrupt!" | default_log();
@@ -1059,12 +1062,12 @@ sqlite::Db init_registry(const Path& xml_path, const Path& db_path, bool force_r
          }
       }
    } else {
-      db = sqlite::Db(sqlite_path.string());
+      db = sqlite::Db(db_path.string());
       create_db = true;
       parse_xml = true;
    }
 
-   if (force_rebuild && !delete_db) {
+   if (force_rebuild && !create_db) {
       clear_db = true;
       parse_xml = true;
    }
@@ -1072,8 +1075,8 @@ sqlite::Db init_registry(const Path& xml_path, const Path& db_path, bool force_r
    if (delete_db) {
       db = sqlite::Db();
       be_short_verbose("") << "Deleting registry DB..." | default_log();
-      fs::remove(sqlite_path);
-      db = sqlite::Db(sqlite_path.string());
+      fs::remove(db_path);
+      db = sqlite::Db(db_path.string());
    }
 
    sqlite::StaticStmtCache cache(db);

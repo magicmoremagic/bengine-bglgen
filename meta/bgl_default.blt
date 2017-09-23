@@ -1,3 +1,8 @@
+/* ################# !! GENERATED CODE -- DO NOT MODIFY !! ################# */
+#pragma once
+#ifndef BE_GFX_BGL_HPP_
+#define BE_GFX_BGL_HPP_
+
 //#bgl stop
 /*
 This file includes excerpts from the combined OpenGL XML registry:
@@ -420,4 +425,9 @@ with each commands using # {
 nl
 `
 } // be::gfx::gl
+
 #endif
+
+#endif
+
+/* ######################### END OF GENERATED CODE ######################### */

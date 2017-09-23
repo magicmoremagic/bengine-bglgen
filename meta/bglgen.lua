@@ -1,17 +1,3 @@
--- Predefined global variables:
--- found_functions = { { name = 'glXXXXX', weight = 100, used_unchecked = true, refs = { { path = '...', weight = 100, checked = true } }, { ... }, ... }
--- found_constants = { { name = 'GL_XXXXX', weight = 100, used_unchecked = true, refs = { { path = '...', weight = 100, checked = true } }, { ... }, ... }
-
--- Predefined gl_registry functions:
--- list_features
--- list_extensions
--- get_feature
--- get_extension
--- get_command
--- get_enum
--- get_type
--- get_group
-
 local table = table
 local debug = debug
 local string = string
@@ -21,6 +7,7 @@ local ipairs = ipairs
 local dofile = dofile
 local getmetatable = getmetatable
 local setmetatable = setmetatable
+local q = gl_registry.query
 
 local fs = require('be.fs')
 local util = require('be.util')
@@ -63,6 +50,63 @@ do -- strict.lua
    end
 
 end
+
+local ignored_ = { }
+ignored = ignored_
+
+local auto_ = { }
+auto = auto_
+
+default_registry_path = nil
+default_registry_db_path = nil
+default_output_path = nil
+default_source_extensions = nil
+default_search_paths = { }
+
+config = {
+   api = 'gl',
+   target_version = '3.3',
+   profile = 'compatibility',
+   auto_related_features = true,
+   auto_related_extensions = true,
+   skip_codegen = false,
+   template = 'bgl_default',
+   features = { },
+   extensions = { },
+   enums = { },
+   commands = { },
+   symbols = { }
+}
+
+found_functions = { }
+found_constants = { }
+
+reserved_identifiers = {
+   alignas = true,   alignof = true,       ['and'] = true,       and_eq = true,
+   asm = true,       atomic_cancel = true, atomic_commit = true, atomic_noexcept = true,
+   auto = true,      bitand = true,        bitor = true,         bool = true,
+   ['break'] = true, case = true,          catch = true,         char = true,
+   char16_t = true,  char32_t = true,      class = true,         compl = true,
+   concept = true,   const = true,         constexpr = true,     const_cast = true,
+   continue = true,  decltype = true,      default = true,       delete = true,
+   ['do'] = true,    double = true,        dynamic_cast = true,  ['else'] = true,
+   enum = true,      explicit = true,      export = true,        extern = true,
+   ['false'] = true, float = true,         ['for'] = true,       friend = true,
+   ['goto'] = true,  ['if'] = true,        import = true,        inline = true,
+   int = true,       long = true,          module = true,        mutable = true,
+   namespace = true, new = true,           noexcept = true,      ['not'] = true,
+   not_eq = true,    nullptr = true,       operator = true,      ['or'] = true,
+   or_eq = true,     private = true,       protected = true,     public = true,
+   register = true,  reinterpret_cast = true,   requires = true, ['return'] = true,
+   short = true,     signed = true,        sizeof = true,        static = true,
+   static_assert = true, static_cast = true, struct = true,      switch = true,
+   synchronized = true,  template = true,  this = true,          thread_local = true,
+   throw = true,     ['true'] = true,      try = true,           typedef = true,
+   typeid = true,    typename = true,      union = true,         unsigned = true,
+   using = true,     virtual = true,       void = true,          volatile = true,
+   wchar_t = true,   ['while'] = true,     xor = true,           xor_eq = true,
+}
+
 
 function dependency () end -- depfile not supported currently
 
@@ -239,54 +283,6 @@ end
 function write_template (template_name, ...)
    write(indent_newlines(template(template_name, ...)))
 end
-
-local q = gl_registry.query
-
-local ignored_ = { }
-local auto_ = { }
-ignored = ignored_
-auto = auto_
-
-config = {
-   api = 'gl',
-   target_version = '3.3',
-   profile = 'compatibility',
-   auto_related_features = true,
-   auto_related_extensions = true,
-   skip_codegen = false,
-   template = 'bgl_default',
-   features = { },
-   extensions = { },
-   enums = { },
-   commands = { },
-   symbols = { }
-}
-
-reserved_identifiers = {
-   alignas = true,   alignof = true,       ['and'] = true,       and_eq = true,
-   asm = true,       atomic_cancel = true, atomic_commit = true, atomic_noexcept = true,
-   auto = true,      bitand = true,        bitor = true,         bool = true,
-   ['break'] = true, case = true,          catch = true,         char = true,
-   char16_t = true,  char32_t = true,      class = true,         compl = true,
-   concept = true,   const = true,         constexpr = true,     const_cast = true,
-   continue = true,  decltype = true,      default = true,       delete = true,
-   ['do'] = true,    double = true,        dynamic_cast = true,  ['else'] = true,
-   enum = true,      explicit = true,      export = true,        extern = true,
-   ['false'] = true, float = true,         ['for'] = true,       friend = true,
-   ['goto'] = true,  ['if'] = true,        import = true,        inline = true,
-   int = true,       long = true,          module = true,        mutable = true,
-   namespace = true, new = true,           noexcept = true,      ['not'] = true,
-   not_eq = true,    nullptr = true,       operator = true,      ['or'] = true,
-   or_eq = true,     private = true,       protected = true,     public = true,
-   register = true,  reinterpret_cast = true,   requires = true, ['return'] = true,
-   short = true,     signed = true,        sizeof = true,        static = true,
-   static_assert = true, static_cast = true, struct = true,      switch = true,
-   synchronized = true,  template = true,  this = true,          thread_local = true,
-   throw = true,     ['true'] = true,      try = true,           typedef = true,
-   typeid = true,    typename = true,      union = true,         unsigned = true,
-   using = true,     virtual = true,       void = true,          volatile = true,
-   wchar_t = true,   ['while'] = true,     xor = true,           xor_eq = true,
-}
 
 ------------------------------------------------------------------------------
 -- Takes an optional table, appends a value to it, and returns it.  If the

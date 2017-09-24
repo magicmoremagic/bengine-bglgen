@@ -35,15 +35,11 @@ This file includes excerpts from the combined OpenGL XML registry:
 #define __GLEXT_H_
 
 #ifndef GLAPIENTRY
-#ifndef APIENTRY
 #ifdef _WIN32
-#define APIENTRY __stdcall
+#define GLAPIENTRY __stdcall
 #else
-#define APIENTRY
+#define GLAPIENTRY
 #endif
-#define BE_GFX_BGL_APIENTRY_DEFINED
-#endif
-#define GLAPIENTRY APIENTRY
 #endif
 
 #include <be/core/be.hpp>
@@ -169,16 +165,31 @@ with each commands using # {
 
 } // be::gfx::gl
 
-#if defined(BE_GFX_BGL_APIENTRY_DEFINED) && !defined(BE_GFX_BGL_IMPLEMENTATION)
-#undef BE_GFX_BGL_APIENTRY_DEFINED
-#undef APIENTRY
-#endif
-
 //////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
 
 #ifdef BE_GFX_BGL_IMPLEMENTATION
+
+#ifdef _WIN32
+#ifdef __gl_h_
+#undef __gl_h_
+#endif
+#ifdef __GL_H__
+#undef __GL_H__
+#endif
+#ifdef GL_VERSION_1_0
+#undef GL_VERSION_1_0
+#endif
+#ifdef GL_VERSION_1_1
+#undef GL_VERSION_1_1
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <Windows.h>
+#include <GL/GL.h>
+#endif
 
 #include <glfw/glfw3.h>
 
@@ -186,12 +197,18 @@ namespace be::gfx::gl {
 
 ////////// BGL ///////////////////////////////////////////////////////////////
 ` with each commands using # {
+   if win32native and (prev_command == nil or not prev_command.win32native) {
+      nl '#ifndef _WIN32'
+   }
    nl `using `fp_name` = `return_decl`(GLAPIENTRY*)(`
    with each params using # {
       if (__k__ > 1) { ', ' }
       decl
    }
    ');'
+   if win32native and (next_command == nil or not next_command.win32native) {
+      nl '#endif'
+   }
 }`
 
 struct BglContext final {`
@@ -204,15 +221,21 @@ with each extensions using # {
 }
 nl
 with each commands using # {
+   if win32native and (prev_command == nil or not prev_command.win32native) {
+      nl '#ifndef _WIN32'
+   }
    nl '   ' fp_name ' b' name ' = nullptr;'
+   if win32native and (next_command == nil or not next_command.win32native) {
+      nl '#endif'
+   }
 }`
 
    static BglContextHandle make_handle() {
-	  return BglContextHandle(new BglContext());
+      return BglContextHandle(new BglContext());
    }
 
    static BglContextHandle make_handle(const BglContext& ctx) {
-	  return BglContextHandle(new BglContext(ctx));
+      return BglContextHandle(new BglContext(ctx));
    }
 };
 
@@ -262,16 +285,20 @@ void check_extension(U64 hash) {
    BglContext& ctx = BE_GFX_BGL_CONTEXT;
    switch (hash)  {`
 with each extensions using # {
-   nl `      case U64(`hash`ll): ctx.b`ctx_name` = `
+   nl `      case U64(`hash`ll): ctx.b`ctx_name` = true`
    with each commands using # {
-      if (__k__ % 5 == 0) {
-         nl '         '
+      if win32native and (prev_command == nil or not prev_command.win32native) {
+         nl '#ifndef _WIN32'
+         nl '        '
       }
-      if __k__ > 1 { ' && ' }
-      'ctx.b' name
-   }
-   if #commands == 0 {
-      'true'
+      if (__k__ % 5 == 1) {
+         nl '        '
+      }
+      ' && ctx.b' name
+      if win32native and (next_command == nil or not next_command.win32native) {
+         nl '#endif'
+         nl '        '
+      }
    }
    `; break;`
 }`
@@ -344,7 +371,13 @@ BglContextHandle init_context() {
    }
    `
 with each commands using # {
+   if win32native and (prev_command == nil or not prev_command.win32native) {
+      nl '#ifndef _WIN32'
+   }
    nl `   ctx.b`name` = `fp_name`(glfwGetProcAddress("`name`"));`
+   if win32native and (next_command == nil or not next_command.win32native) {
+      nl '#endif'
+   }
 }
 nl
 with each features using # {
@@ -353,13 +386,33 @@ with each features using # {
       'ctx.b' prev_feature.ctx_name ' && '
    }
    `(major > `version_major` || major == `version_major` && minor >= `version_minor`)`
-   with each commands using # {
-      if (__k__ % 5 == 1) {
-         nl '      '
+   if (version_major == 1 && (version_minor == 0 || version_minor == 1)) {
+      nl '#ifndef _WIN32'
+      with each commands using # {
+         if (__k__ % 5 == 1) {
+            nl '     '
+         }
+         ' && ctx.b' name
       }
-      ' && ctx.b' name
+      nl '#endif'
+      nl '      ;'
+   } else {
+      with each commands using # {
+         if win32native and (prev_command == nil or not prev_command.win32native) {
+            nl '#ifndef _WIN32'
+            nl '     '
+         }
+         if (__k__ % 5 == 1) {
+            nl '     '
+         }
+         ' && ctx.b' name
+         if win32native and (next_command == nil or not next_command.win32native) {
+            nl '#endif'
+            nl '     '
+         }
+      }
+      ';'
    }
-   ';'
 }`
 
    if (major >= 3) {
@@ -444,14 +497,36 @@ with each commands using # {
       if (__k__ > 1) ', '
       decl ' ' name
    }
-   ') noexcept {' nl
-   `   return BE_GFX_BGL_CONTEXT.b`name`(`
+   `) noexcept {` 
+   if win32native {
+      nl '#ifdef _WIN32'
+      nl '   '
+      if return_decl ~= 'void ' {
+         'return '
+      }
+      `::`name`(`
+      with each params using # {
+         if (__k__ > 1) ', '
+         name
+      }
+      `);`
+      nl '#else'
+   }
+   nl '   '
+   if return_decl ~= 'void ' {
+      'return '
+   }
+   `BE_GFX_BGL_CONTEXT.b`name`(`
    with each params using # {
       if (__k__ > 1) ', '
       name
    }
-   ');' nl
-   '}'
+   `);`
+   if win32native {
+      nl '#endif'
+   }
+   nl
+   `}`
 }
 nl
 `

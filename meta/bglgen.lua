@@ -838,9 +838,6 @@ end
 ------------------------------------------------------------------------------
 function generate (ctx)
    local sorted_features = make_sorted(ctx.features)
-   local reverse_features = make_sorted(ctx.features, function (a, b)
-         return a.id > b.id
-      end)
    local sorted_extensions = make_sorted(ctx.extensions)
    local sorted_types = make_sorted(ctx.types)
    local sorted_groups = make_sorted(ctx.groups)
@@ -980,8 +977,10 @@ function generate (ctx)
    -- commands --
    local max_command_length = 0
    local commands = { }
+   local previous_command
    for i = 1, #sorted_commands do
       local c = sorted_commands[i]
+      c.prev_command = previous_command
       c.params = { }
       q([[
          SELECT param_index, declaration, name
@@ -1046,6 +1045,9 @@ function generate (ctx)
                map = c.deprecated_by
             end
             local name = component:gsub('GL_', ''):gsub('VERSION_(%d+)_(%d+)', 'GL %1.%2')
+            if name == 'GL 1.0' or name == 'GL 1.1' then
+               c.win32native = true
+            end
             if profile then
                name = name .. ' (' .. profile .. ')'
             end
@@ -1054,7 +1056,14 @@ function generate (ctx)
 
       c.comment = q([[SELECT comment FROM commands WHERE id = ?]], c.id)
 
+      previous_command = c
       commands[c.id] = c
+   end
+   previous_command = nil
+   for i = #sorted_commands, 1, -1 do
+      local f = commands[sorted_commands[i].id]
+      f.next_command = previous_command
+      previous_command = f
    end
 
 
@@ -1090,9 +1099,8 @@ function generate (ctx)
       features[f.id] = f
    end
    previous_feature = nil
-   for i = 1, #reverse_features do
-      local f = features[reverse_features[i].id]
-      reverse_features[i] = f
+   for i = #sorted_features, 1, -1 do
+      local f = features[sorted_features[i].id]
       f.next_feature = previous_feature
       previous_feature = f
    end
@@ -1134,7 +1142,6 @@ function generate (ctx)
    write_template(ctx.cfg.template, {
       comment = comment,
       features = sorted_features,
-      reverse_features = reverse_features,
       extensions = sorted_extensions,
       types = sorted_types,
       groups = sorted_groups,

@@ -1158,7 +1158,7 @@ sqlite::Db init_registry(const Path& xml_path, const Path& db_path, bool force_r
                      get_command_name.reset();
                      get_command_name.bind(1, p.first);
                      get_command_name.step();
-                     const char* command_name = get_command_name.get_text(0);
+                     const char* command_name = get_command_name.get_text(0).data();
                      be_warn() << "Command 'alias' element references undefined command."
                         & attr("Aliasing Command") << S(command_name)
                         & attr("Aliased Command") << S(alias_name)
@@ -1182,7 +1182,7 @@ sqlite::Db init_registry(const Path& xml_path, const Path& db_path, bool force_r
                      get_command_name.reset();
                      get_command_name.bind(1, p.first);
                      get_command_name.step();
-                     const char* command_name = get_command_name.get_text(0);
+                     const char* command_name = get_command_name.get_text(0).data();
                      be_warn() << "Command 'vecequiv' element references undefined command."
                         & attr("Scalar Command") << S(command_name)
                         & attr("Vector Command") << S(alias_name)

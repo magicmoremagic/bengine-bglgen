@@ -20,7 +20,7 @@ struct SymbolUsage {
 ///////////////////////////////////////////////////////////////////////////////
 class Lexer final : Immovable {
 public:
-   Lexer(Path path, gsl::string_span<> input, std::unordered_multimap<S, SymbolUsage>& output);
+   Lexer(Path path, SV input, std::unordered_multimap<S, SymbolUsage>& output);
    void operator()();
 private:
    void symbol_();
@@ -28,17 +28,17 @@ private:
    void set_weight_();
    void comment_();
    void bgl_malformed_();
-   
+
    Path path_;
-   gsl::string_span<> input_;
+   SV input_;
    std::unordered_multimap<S, SymbolUsage>& output_;
 
-   char* ps_;
-   char* p_;
-   char* pe_;
-   char* ts_;
-   char* te_;
-   char* ls_;
+   const char* ps_;
+   const char* p_;
+   const char* pe_;
+   const char* ts_;
+   const char* te_;
+   const char* ls_;
    U32 line_;
    U16 weight_;
    bool ignore_symbols_;

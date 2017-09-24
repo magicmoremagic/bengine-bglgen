@@ -47,12 +47,12 @@ namespace {
    main := |*
       non_gl_identifier => {};
       gl_identifier => { symbol_(); };
-	  bgl_stop => { ignore_symbols_ = true; };
+      bgl_stop => { ignore_symbols_ = true; };
       bgl_checked => { set_check_(); };
       bgl_unchecked => { check_ = S(); };
       bgl_weight => { set_weight_(); };
       bgl_reset_weight => { weight_ = 100; };
-	  bgl_malformed => { bgl_malformed_(); };
+      bgl_malformed => { bgl_malformed_(); };
       newline => { ls_ = te_; ++line_; };
       string_literal => {};
       single_line_comment => {};
@@ -65,7 +65,7 @@ namespace {
 } // be::bglgen::()
 
 ///////////////////////////////////////////////////////////////////////////////
-Lexer::Lexer(Path path, gsl::string_span<> input, std::unordered_multimap<S, SymbolUsage>& output)
+Lexer::Lexer(Path path, SV input, std::unordered_multimap<S, SymbolUsage>& output)
    : path_(std::move(path)),
      input_(input),
 	 output_(output),
@@ -78,7 +78,7 @@ void Lexer::operator()() {
    ignore_symbols_ = false;
    ps_ = p_ = input_.data();
    pe_ = p_ + input_.length();
-   char* eof = pe_;
+   const char* eof = pe_;
    int cs;
    int act;
    ls_ = p_;
@@ -96,7 +96,7 @@ void Lexer::symbol_() {
    if (ignore_symbols_) return;
    std::ptrdiff_t offset = ts_ - ps_;
    std::ptrdiff_t length = te_ - ts_;
-   gsl::string_span<> symbol = input_.subspan(offset, length);
+   SV symbol = input_.substr(offset, length);
    output_.insert(std::make_pair(S(symbol.begin(), symbol.end()), SymbolUsage { path_, line_, weight_, check_ }));
 }
 
@@ -104,7 +104,7 @@ void Lexer::symbol_() {
 void Lexer::set_check_() {
    std::ptrdiff_t offset = ts_ - ps_;
    std::ptrdiff_t length = te_ - ts_;
-   gsl::string_span<> symbol = input_.subspan(offset, length);
+   SV symbol = input_.substr(offset, length);
    
    auto begin = symbol.end(), end = symbol.end();
    for (auto it = symbol.end() - 1; true; --it) {
@@ -129,7 +129,7 @@ void Lexer::set_check_() {
 void Lexer::set_weight_() {
    std::ptrdiff_t offset = ts_ - ps_;
    std::ptrdiff_t length = te_ - ts_;
-   gsl::string_span<> symbol = input_.subspan(offset, length);
+   SV symbol = input_.substr(offset, length);
    
    U16 weight = 0;
    for (auto it = symbol.begin(), end = symbol.end(); it != end; ++it) {
@@ -151,7 +151,7 @@ void Lexer::set_weight_() {
 void Lexer::comment_() {
    std::ptrdiff_t offset = ts_ - ps_;
    std::ptrdiff_t length = te_ - ts_;
-   gsl::string_span<> comment = input_.subspan(offset, length);
+   SV comment = input_.substr(offset, length);
 
    bool prev_was_cr = false;
    int i = 0;
@@ -185,9 +185,9 @@ void Lexer::comment_() {
 void Lexer::bgl_malformed_() {
    std::ptrdiff_t offset = ts_ - ps_;
    std::ptrdiff_t length = te_ - ts_;
-   gsl::string_span<> symbol = input_.subspan(offset, length);
+   SV symbol = input_.substr(offset, length);
    be_warn("") << "Malformed //#bgl declaration!"
-	  & attr("Declaration") << S(symbol.begin(), symbol.end())
+	  & attr("Declaration") << S(symbol)
 	  & attr("Path") << path_.generic_string()
 	  & attr("Line") << line_
 	  | default_log();

@@ -4,6 +4,7 @@
 #define BE_GFX_BGL_HPP_
 
 //#bgl stop
+
 /*
 This file includes excerpts from the combined OpenGL XML registry:
    `indent() indent_newlines(comment) unindent()`
@@ -128,8 +129,36 @@ nl '   ' rpad(name, maxenumlen) ' = ' raw_value suffix ',' extra
 }`
 };
 
-////////// COMMANDS //////////////////////////////////////////////////////////
-` with each commands using # {
+////////// COMMANDS //////////////////////////////////////////////////////////`
+with each commands using # {
+   nl
+   if #aliases > 0 {
+      nl '// Aliases:'
+      with each aliases using # {
+         if __k__ > 1 { ',' }
+         ' ' $
+      }
+   }
+   if vecequiv {
+      nl '// Vector equiv: ' vecequiv
+   }
+   if #defined_by > 0 {
+      nl '// Defined by:'
+      with each defined_by using # {
+         if __k__ > 1 { ',' }
+         ' ' $
+      }
+   }
+   if #deprecated_by > 0 {
+      nl '// Deprecated by:'
+      with each deprecated_by using # {
+         if __k__ > 1 { ',' }
+         ' ' $
+      }
+   }
+   if comment {
+      nl '// ' comment
+   }
    nl return_decl name '('
    with each params using # {
       if (__k__ > 1) ', '

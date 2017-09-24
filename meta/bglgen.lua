@@ -1004,7 +1004,57 @@ function generate (ctx)
             end
          end)
 
-         commands[c.id] = c
+      local command_aliases = { }
+      q([[
+         SELECT preferred_id, preferred_name, alias_id, alias_name, type
+         FROM command_alias_names WHERE preferred_id = ? OR alias_id = ?
+         ]], { c.id, c.id },
+         function (pref_id, pref_name, alias_id, alias_name, type)
+            if type == 0 then
+               if pref_id ~= c.id then
+                  command_aliases[pref_id] = pref_name
+               elseif alias_id ~= c.id then
+                  command_aliases[alias_id] = alias_name
+               end
+            elseif alias_id == c.id then
+               c.vecequiv = pref_name
+            end
+         end)
+
+      c.aliases = { }
+      for k in pairs(command_aliases) do
+         c.aliases[#c.aliases + 1] = k
+      end
+      table.sort(c.aliases)
+      for j = 1, #c.aliases do c.aliases[j] = command_aliases[c.aliases[j]] end
+
+      c.defined_by = { }
+      c.deprecated_by = { }
+      q([[
+         SELECT component, op, profile
+         FROM command_components
+         WHERE command_id = ?
+         AND (api_id = ? OR api_id IS NULL)
+         AND (profile_id = ? OR profile_id IS NULL)
+         ORDER BY op DESC
+         ]], { c.id, ctx.api_id, ctx.profile_id },
+         function (component, op, profile)
+            local map
+            if op == 1 then
+               map = c.defined_by
+            else
+               map = c.deprecated_by
+            end
+            local name = component:gsub('GL_', ''):gsub('VERSION_(%d+)_(%d+)', 'GL %1.%2')
+            if profile then
+               name = name .. ' (' .. profile .. ')'
+            end
+            map[#map + 1] = name
+         end)
+
+      c.comment = q([[SELECT comment FROM commands WHERE id = ?]], c.id)
+
+      commands[c.id] = c
    end
 
 

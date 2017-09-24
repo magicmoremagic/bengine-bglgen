@@ -288,6 +288,19 @@ LEFT JOIN apis ON (component_commands.api_id = apis.id)
 LEFT JOIN profiles ON (component_commands.profile_id = profiles.id)
 ]]},
 
+{'CV_COMMAND_ALIAS_NAMES', [[
+CREATE VIEW command_alias_names AS
+SELECT
+   cp.id preferred_id,
+   cp.name preferred_name,
+   ca.id alias_id,
+   ca.name alias_name,
+   command_aliases.type type
+FROM command_aliases
+LEFT JOIN commands cp ON (command_aliases.preferred_id = cp.id)
+LEFT JOIN commands ca ON (command_aliases.alias_id = ca.id)
+]]},
+
 {'CV_API_TYPES', [[
 CREATE VIEW api_types AS
 SELECT
@@ -340,7 +353,7 @@ LEFT JOIN enum_aliases ON (enums.id = enum_aliases.alias_id)
 LEFT JOIN enums enums2 ON (enums2.id = enum_aliases.preferred_id)
 ]]},
 
-}) !! 172 */
+}) !! 176 */
 /* ################# !! GENERATED CODE -- DO NOT MODIFY !! ################# */
 #pragma once
 #ifndef BE_BGLGEN_SQL_IDS_HPP_
@@ -412,6 +425,8 @@ LEFT JOIN enums enums2 ON (enums2.id = enum_aliases.preferred_id)
 #define  BEID_BGLGEN_SQL_CV_ENUM_COMPONENTS         0x65DC72E07843E020
 #define BEIDN_BGLGEN_SQL_CV_COMMAND_COMPONENTS      "CREATE VIEW command_components AS\nSELECT\n   commands.id command_id,\n   commands.name name,\n   component_commands.component_id component_id,\n   components.name component,\n   component_commands.api_id api_id,\n   apis.name api,\n   component_commands.profile_id profile_id,\n   profiles.name profile,\n   component_commands.op op,\n   components.type component_type,\n   components.version_major version_major,\n   components.version_minor version_minor\nFROM commands\nINNER JOIN component_commands ON (commands.id = component_commands.command_id)\nLEFT JOIN components ON (component_commands.component_id = components.id)\nLEFT JOIN apis ON (component_commands.api_id = apis.id)\nLEFT JOIN profiles ON (component_commands.profile_id = profiles.id)\n"
 #define  BEID_BGLGEN_SQL_CV_COMMAND_COMPONENTS      0x191E723238577086
+#define BEIDN_BGLGEN_SQL_CV_COMMAND_ALIAS_NAMES     "CREATE VIEW command_alias_names AS\nSELECT\n   cp.id preferred_id,\n   cp.name preferred_name,\n   ca.id alias_id,\n   ca.name alias_name,\n   command_aliases.type type\nFROM command_aliases\nLEFT JOIN commands cp ON (command_aliases.preferred_id = cp.id)\nLEFT JOIN commands ca ON (command_aliases.alias_id = ca.id)\n"
+#define  BEID_BGLGEN_SQL_CV_COMMAND_ALIAS_NAMES     0x21B3787848581584
 #define BEIDN_BGLGEN_SQL_CV_API_TYPES               "CREATE VIEW api_types AS\nSELECT\n   types.id type_id,\n   types.name name,\n   type_declarations.api_id api_id,\n   type_declarations.declaration declaration,\n   type_declarations.comment comment\nFROM types\nINNER JOIN type_declarations ON (types.id = type_declarations.type_id)\n"
 #define  BEID_BGLGEN_SQL_CV_API_TYPES               0xBEAD52040F6DAB67
 #define BEIDN_BGLGEN_SQL_CV_API_ENUMS               "CREATE VIEW api_enums AS\nSELECT\n   enums.id enum_id,\n   enums.name name,\n   enum_declarations.api_id api_id,\n   enum_aliases.preferred_id,\n   enums2.name preferred_name,\n   enums.bitmask bitmask,\n   enum_declarations.value value,\n   enum_declarations.raw_value raw_value,\n   enum_declarations.suffix suffix,\n   enum_declarations.comment comment\nFROM enums\nINNER JOIN enum_declarations ON (enums.id = enum_declarations.enum_id)\nLEFT JOIN enum_aliases ON (enums.id = enum_aliases.alias_id)\nLEFT JOIN enums enums2 ON (enums2.id = enum_aliases.preferred_id)\n"
@@ -456,6 +471,7 @@ extern const Id bglgen_sql_cv_features;
 extern const Id bglgen_sql_cv_type_components;
 extern const Id bglgen_sql_cv_enum_components;
 extern const Id bglgen_sql_cv_command_components;
+extern const Id bglgen_sql_cv_command_alias_names;
 extern const Id bglgen_sql_cv_api_types;
 extern const Id bglgen_sql_cv_api_enums;
 extern const Id bglgen_sql_cv_api_group_enums;
@@ -502,6 +518,7 @@ const Id bglgen_sql_cv_features = Id(BEIDN_BGLGEN_SQL_CV_FEATURES);
 const Id bglgen_sql_cv_type_components = Id(BEIDN_BGLGEN_SQL_CV_TYPE_COMPONENTS);
 const Id bglgen_sql_cv_enum_components = Id(BEIDN_BGLGEN_SQL_CV_ENUM_COMPONENTS);
 const Id bglgen_sql_cv_command_components = Id(BEIDN_BGLGEN_SQL_CV_COMMAND_COMPONENTS);
+const Id bglgen_sql_cv_command_alias_names = Id(BEIDN_BGLGEN_SQL_CV_COMMAND_ALIAS_NAMES);
 const Id bglgen_sql_cv_api_types = Id(BEIDN_BGLGEN_SQL_CV_API_TYPES);
 const Id bglgen_sql_cv_api_enums = Id(BEIDN_BGLGEN_SQL_CV_API_ENUMS);
 const Id bglgen_sql_cv_api_group_enums = Id(BEIDN_BGLGEN_SQL_CV_API_GROUP_ENUMS);

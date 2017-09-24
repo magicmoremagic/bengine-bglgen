@@ -39,7 +39,8 @@ void create_registry_db(sqlite::Db& db) {
    views = {
       'features', 'extensions',
       'type_components', 'enum_components', 'command_components',
-      'api_types', 'api_enums', 'api_group_enums'
+      'api_types', 'api_enums', 'api_group_enums',
+      'command_alias_names'
    }
 
    schema_ids = { 'CT_REGISTRY_INFO' }
@@ -63,7 +64,7 @@ void create_registry_db(sqlite::Db& db) {
    end
    
    register_template_string([[`with each $ using # { nl `sqlite::exec(db, BEIDN_BGLGEN_SQL_`$`);`} nl]], 'exec_ids')
-   write_template('exec_ids', schema_ids) !! 40 */
+   write_template('exec_ids', schema_ids) !! 41 */
    /* ################# !! GENERATED CODE -- DO NOT MODIFY !! ################# */
 
    sqlite::exec(db, BEIDN_BGLGEN_SQL_CT_REGISTRY_INFO);
@@ -101,6 +102,7 @@ void create_registry_db(sqlite::Db& db) {
    sqlite::exec(db, BEIDN_BGLGEN_SQL_CV_API_TYPES);
    sqlite::exec(db, BEIDN_BGLGEN_SQL_CV_API_ENUMS);
    sqlite::exec(db, BEIDN_BGLGEN_SQL_CV_API_GROUP_ENUMS);
+   sqlite::exec(db, BEIDN_BGLGEN_SQL_CV_COMMAND_ALIAS_NAMES);
 
    /* ######################### END OF GENERATED CODE ######################### */
 
@@ -117,7 +119,7 @@ void create_registry_db(sqlite::Db& db) {
 //////////////////////////////////////////////////////////////////////////////
 Id get_schema_checksum() {
    /*!! register_template_string([[static const Id checksum = Id(`with each $ using # { nl `   BEIDN_BGLGEN_SQL_` $ } nl `);]], 'schema_checksum')
-   write_template('schema_checksum', schema_ids) !! 40 */
+   write_template('schema_checksum', schema_ids) !! 41 */
    /* ################# !! GENERATED CODE -- DO NOT MODIFY !! ################# */
    static const Id checksum = Id(
       BEIDN_BGLGEN_SQL_CT_REGISTRY_INFO
@@ -155,6 +157,7 @@ Id get_schema_checksum() {
       BEIDN_BGLGEN_SQL_CV_API_TYPES
       BEIDN_BGLGEN_SQL_CV_API_ENUMS
       BEIDN_BGLGEN_SQL_CV_API_GROUP_ENUMS
+      BEIDN_BGLGEN_SQL_CV_COMMAND_ALIAS_NAMES
    );
    /* ######################### END OF GENERATED CODE ######################### */
 

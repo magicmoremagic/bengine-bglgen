@@ -5,6 +5,9 @@
 #include "version.hpp"
 #include "gl_registry.hpp"
 #include <be/core/version.hpp>
+#include <be/util/version.hpp>
+#include <be/sqlite/version.hpp>
+#include <be/blt/version.hpp>
 #include <be/core/alg.hpp>
 #include <be/core/logging.hpp>
 #include <be/core/log_exception.hpp>
@@ -24,6 +27,7 @@
 #include <be/sqlite/static_stmt_cache.hpp>
 #include <be/sqlite/transaction.hpp>
 #include <be/sqlite/log_exception.hpp>
+#include <lua/lua.h>
 
 namespace be::bglgen {
 namespace {
@@ -413,14 +417,13 @@ BglGenApp::BglGenApp(int argc, char** argv) {
          (abstract(Cell() << "Each argument in " << fg_cyan << "SOURCE_DIRS" << fg_reset << " corresponds to a directory which will "
             "be recursively searched for source files.").verbose())
 
-         (abstract(Cell() << "Output will always be printed to standard output.  Much of the code generation is done via internal Lua scripts.  "
+         (abstract(Cell() << "Code generation is done via internal Lua scripts, but it can be customized or replaced entirely.  "
             "If a file named " << fg_blue << ".bglgenrc" << reset << " exists in the working directory or a parent directory, it will be "
-            "loaded after the internal scripts and before code generation begins.  This allows overriding various hooks to customize the "
-            "format and behavior of the generator.").verbose())
+            "loaded after the internal scripts and before code generation begins.").verbose())
 
          (param({ }, { "registry" }, "PATH", [&](const S& path) {
                registry_location_ = path;
-            }).desc("Specifies the location of the OpenGL registry (gl.xml).")
+            }).desc(Cell() << "Specifies the location of the OpenGL registry (" << fg_blue << "gl.xml" << reset << ").")
             .extra(Cell() << "If not provided, BGLgen will recursively check the current directory and it parent directories "
                "until it finds a file called " << fg_blue << "gl.xml" << reset << " or the filesystem root is reached."))
 
@@ -432,17 +435,18 @@ BglGenApp::BglGenApp(int argc, char** argv) {
 
          (flag({ "m" }, { "mem-db" }, registry_db_location_, Path(":memory:"))
             .desc("Store the GL registry into an in memory instead of on disk.")
-            .extra(Cell() << "Equivalent to " << fg_yellow << "--db  " << fg_cyan << ":memory:" << reset << "."))
+            .extra("Much faster than rebuilding the registry on disk, but slower than being able to reuse an existing disk database.")
+            .extra(Cell() << "Equivalent to " << fg_yellow << "--db  " << fg_cyan << ":memory:" << reset))
 
          (flag({ }, { "rebuild-db" }, rebuild_db_)
             .desc("Forces the registry database to be rebuilt even if its checksum matches the XML registry."))
 
-         (param({ "x" }, { "extensions" }, "EXT", [&](const S& extensions) {
+         (param({ "t" }, { "source-extensions" }, "EXT", [&](const S& extensions) {
                extension_regex_ = extensions;
             })
-            .desc("Specifies which types of files to consider source files when searching directories.")
+            .desc("Regular expression determining which types of files to consider source files when searching directories.")
             .extra(Cell() << "Default value: " << color::fg_cyan << "c|cc|cxx|cpp|hpp|inl" << color::reset)
-            .extra("Only affects directories specified after it on the command line, and overrides any previous value."))
+            .extra("Matches against a file's extension.  Overrides any previous value."))
 
          (param({ "d" }, { "dir" }, "PATH", [&](const S& path) {
                search_dirs_.push_back(std::make_pair(Path(path), false));
@@ -454,7 +458,8 @@ BglGenApp::BglGenApp(int argc, char** argv) {
 
          (param({ "o" }, { "output" }, "PATH", [&](const S& path) {
                output_location_ = path;
-            }))
+            }).desc("Specifies the path to write the generated code to.")
+            .extra("Any existing content will be truncated.  If not specified, output will be printed to standard output."))
 
          (any([&](const S& path) {
                search_dirs_.push_back(std::make_pair(Path(path), true));
@@ -505,9 +510,14 @@ BglGenApp::BglGenApp(int argc, char** argv) {
       if (show_version) {
          proc
             (prologue(BE_BGLGEN_VERSION_STRING).query())
+            (prologue(BE_BLT_VERSION_STRING).query())
+            (prologue(BE_SQLITE_VERSION_STRING).query())
+            (prologue(BE_UTIL_VERSION_STRING).query())
             (prologue(BE_CORE_VERSION_STRING).query())
+            (prologue(LUA_RELEASE).query())
             (license(BE_LICENSE).query())
             (license(BE_COPYRIGHT).query())
+            (license(LUA_COPYRIGHT).query())
             ;
       }
 

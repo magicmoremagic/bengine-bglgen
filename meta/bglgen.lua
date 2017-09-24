@@ -880,16 +880,21 @@ function generate (ctx)
    -- enums --
    local max_enum_length = 0
    local enums = { }
+   local enum_reverse_lookup = { }
    for i = 1, #sorted_enums do
       local e = sorted_enums[i]
-      e.name, e.preferred_name, e.raw_value, e.suffix, e.comment = q([[
-         SELECT name, preferred_name, raw_value, suffix, comment
+      e.name, e.preferred_name, e.value, e.raw_value, e.suffix, e.comment = q([[
+         SELECT name, preferred_name, value, raw_value, suffix, comment
          FROM api_enums
          WHERE enum_id = ?
          AND (api_id = ? OR api_id IS NULL)
          ORDER BY api_id DESC LIMIT 1
          ]], e.id, ctx.api_id)
-      
+
+      if e.suffix == nil and enum_reverse_lookup[e.value] == nil then
+         enum_reverse_lookup[e.value] = e
+      end
+
       e.transformed_name = e.name:gsub('^GL_%f[A-Z]',''):lower()
       if reserved_identifiers[e.transformed_name] then
          e.transformed_name = e.name:lower()
@@ -939,6 +944,11 @@ function generate (ctx)
       enums[e.id] = e
       max_enum_length = math.max(max_enum_length, #e.name)
    end
+   local enum_values = { }
+   for k,v in pairs(enum_reverse_lookup) do
+      enum_values[#enum_values + 1] = v
+   end
+   table.sort(enum_values, function (a, b) return a.value < b.value end)
 
 
    -- groups --
@@ -949,7 +959,7 @@ function generate (ctx)
       g.name = q('SELECT name FROM groups WHERE id = ? LIMIT 1', g.id)
       g.enums = { }
       g.max_name_length = 0
-      
+
       q('SELECT enum_id FROM group_enums WHERE group_id = ? ORDER BY enum_id ASC', { g.id },
          function (enum_id)
             local e = enums[enum_id]
@@ -1037,6 +1047,7 @@ function generate (ctx)
       previous_feature = f
    end
 
+
    -- extensions --
    local extension_hashes = { }
    for i = 1, #sorted_extensions do
@@ -1054,7 +1065,7 @@ function generate (ctx)
       else
          extension_hashes[x.hash] = x
       end
-      
+
       x.commands = { }
       q([[
          SELECT command_id FROM component_commands
@@ -1078,8 +1089,9 @@ function generate (ctx)
       types = sorted_types,
       groups = sorted_groups,
       enums = sorted_enums,
+      enum_values = enum_values,
       commands = sorted_commands,
-      
+
       skip_groups = ctx.cfg.skip_groups,
       max_enum_name_length = max_enum_length,
       max_command_name_length = max_command_length,

@@ -284,8 +284,6 @@ BglContextHandle init_context() {
    BglContext& ctx = bglctx;
 #endif
 
-   
-
    using GLGETSTRING_PROC = const unsigned char* (GLAPIENTRY*)(GLenum);
    using GLGETSTRINGI_PROC = const unsigned char* (GLAPIENTRY*)(GLenum, unsigned int);
    using GLGETINTEGERV_PROC = void (GLAPIENTRY*)(GLenum, int *);
@@ -383,8 +381,12 @@ void switch_context(const BglContextHandle& context) noexcept {
 
 //////////////////////////////////////////////////////////////////////////////
 const char* enum_name (GLenum e) noexcept {
-   // TODO
-   return nullptr;
+   switch (e) {`
+with each enum_values using # {
+nl '      case ' raw_value suffix ': return "' name '";'
+}`
+      default: return "?";
+   }
 }
 
 ////////// FEATURES (IMPL) ///////////////////////////////////////////////////

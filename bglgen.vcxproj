@@ -13,7 +13,7 @@
   <PropertyGroup Label="Globals">
     <ProjectName>bglgen</ProjectName>
     <RootNamespace>bglgen</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0.15063.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.16299.0</WindowsTargetPlatformVersion>
     <ProjectGuid>{2114A415-0142-42FD-8EE4-B800BA898321}</ProjectGuid>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />

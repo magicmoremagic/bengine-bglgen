@@ -155,7 +155,7 @@ with each commands using # {
    if comment {
       nl '// ' comment
    }
-   nl return_decl name '('
+   nl return_decl ' ' name '('
    with each params using # {
       if (__k__ > 1) ', '
       decl ' ' name
@@ -281,9 +281,10 @@ U64 hash_name(const char* begin, const char* end) {
 }
 
 //////////////////////////////////////////////////////////////////////////////
-void check_extension(U64 hash) {
+void check_extension(U64 hash) {`
+if #extensions > 0 {`
    BglContext& ctx = BE_GFX_BGL_CONTEXT;
-   switch (hash)  {`
+   switch (hash) {`
 with each extensions using # {
    nl `      case U64(`hash`ll): ctx.b`ctx_name` = true`
    with each commands using # {
@@ -303,7 +304,8 @@ with each extensions using # {
    `; break;`
 }`
    }
-}
+`} else {' '}
+`}
 
 } // ()
 

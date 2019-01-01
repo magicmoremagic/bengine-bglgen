@@ -4,6 +4,7 @@
 #include <be/core/logging.hpp>
 #include <be/util/get_file_contents.hpp>
 #include <be/util/keyword_parser.hpp>
+#include <be/util/trim.hpp>
 #include <be/sqlite/static_stmt_cache.hpp>
 #include <be/sqlite/transaction.hpp>
 #include <be/sqlite/queries.hpp>
@@ -572,7 +573,7 @@ void parse_commands(sqlite::StmtCache& cache, pugi::xml_node node, std::vector<s
       S return_decl;
       for (auto proto_node : proto.children()) {
          if (proto_node.type() != pugi::node_element) {
-            return_decl.append(proto_node.value());
+            return_decl.append(trim_right(SV(proto_node.value()), is_whitespace<char>));
          } else if (0 == strcmp(proto_node.name(), "name")) {
             break;
          } else {

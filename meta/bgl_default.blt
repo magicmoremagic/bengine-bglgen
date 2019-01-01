@@ -200,7 +200,7 @@ namespace be::gfx::gl {
    if win32native and (prev_command == nil or not prev_command.win32native) {
       nl '#ifndef _WIN32'
    }
-   nl `using `fp_name` = `return_decl`(GLAPIENTRY*)(`
+   nl `using `fp_name` = `return_decl` (GLAPIENTRY*)(`
    with each params using # {
       if (__k__ > 1) { ', ' }
       decl
@@ -494,7 +494,7 @@ nl
 ////////// COMMANDS (IMPL) ///////////////////////////////////////////////////
 `
 with each commands using # {
-   nl return_decl name '('
+   nl return_decl ' ' name '('
    with each params using # {
       if (__k__ > 1) ', '
       decl ' ' name
@@ -503,7 +503,7 @@ with each commands using # {
    if win32native {
       nl '#ifdef _WIN32'
       nl '   '
-      if return_decl ~= 'void ' {
+      if return_decl ~= 'void' {
          'return '
       }
       `::`name`(`
@@ -515,7 +515,7 @@ with each commands using # {
       nl '#else'
    }
    nl '   '
-   if return_decl ~= 'void ' {
+   if return_decl ~= 'void' {
       'return '
    }
    `BE_GFX_BGL_CONTEXT.b`name`(`

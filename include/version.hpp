@@ -6,7 +6,7 @@
 
 #define BE_BGLGEN_VERSION_MAJOR 0
 #define BE_BGLGEN_VERSION_MINOR 1
-#define BE_BGLGEN_VERSION_REV 17
+#define BE_BGLGEN_VERSION_REV 18
 
 /*!! include('common/version', 'BE_BGLGEN', 'BGLgen') !! 6 */
 /* ################# !! GENERATED CODE -- DO NOT MODIFY !! ################# */
